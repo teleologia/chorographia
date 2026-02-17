@@ -6,9 +6,9 @@ A semantic map of your Obsidian vault. Your notes become points in space, cluste
 
 ## What is this?
 
-Chorographia turns your vault into an interactive 2D map. Notes that are semantically similar end up close together — not because they link to each other, but because they're *about* similar things. You can see the shape of your knowledge at a glance: where your clusters of thought are, where the gaps live, and how topics connect.
+Chorographia turns your vault into an interactive 2D map. Notes that are semantically similar end up close together, not because they link to each other, but because they're *about* similar things. You can see the shape of your knowledge at a glance: where your clusters of thought are, where the gaps live, and how topics connect.
 
-I built this because I wanted to see my Zettelkasten the way I think about it — as a landscape with regions and neighborhoods, not just a graph of links.
+I built this because I wanted to see my Zettelkasten the way I think about it, as a kind of space map, not just a graph of links.
 
 ## How it works
 
@@ -35,7 +35,7 @@ The result is a map you can pan, zoom, and click through.
 
 **Semantic zones** — Soft, color-coded regions drawn behind the points using convex hulls with Chaikin subdivision. Each zone gets an auto-label from the most common folder or category, and optionally an LLM-generated name.
 
-**Color modes** — Switch between semantic (frontmatter `sem_k` clusters), folder, note type, or category coloring.
+**Color modes** — Switch between semantic (`sem_k` clusters), folder, note type, or category coloring.
 
 **Link overlay** — Wikilink edges rendered between notes. Hover or select a note to highlight its connections.
 
@@ -84,12 +84,12 @@ This plugin isn't in the Obsidian community plugins directory yet. To install ma
 
 This is a beta. Things that are rough:
 
-- **Performance** — UMAP runs on the main thread, so layout computation blocks the UI briefly for large vaults. Will move to a web worker eventually.
-- **No incremental layout** — Adding a few notes currently requires recomputing the entire UMAP projection. Incremental updates are planned.
-- **Zone naming** — LLM naming quality varies. Ollama with smaller models sometimes produces odd names. OpenAI's GPT-4o-mini tends to do better.
+- **Performance** — UMAP runs on the main thread, so layout computation blocks the UI briefly for large vaults.
+- **No incremental layout** — Adding a few notes currently requires recomputing the entire UMAP projection. 
+- **Zone naming** — LLM naming quality varies. Ollama with smaller models sometimes produces odd names. OpenAI's models tend to do better.
 - **Community plugins submission** — Plan to submit once the beta is stable and the API surface is settled.
 
-If you hit bugs or have ideas, open an issue.
+If you hit bugs or have ideas, feel free to open an issue!
 
 ## License
 
