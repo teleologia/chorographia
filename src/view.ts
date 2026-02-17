@@ -6,6 +6,7 @@ import { kMeans, computeSemanticAssignments } from "./kmeans";
 import { Zone, computeZones, drawZone, transformZoneToLocal } from "./zones";
 import { generateZoneNames } from "./zoneNaming";
 import { generateZoneNamesOllama } from "./ollama";
+import { generateZoneNamesOpenRouter } from "./openrouter";
 
 export const VIEW_TYPE = "chorographia-map";
 
@@ -72,6 +73,43 @@ function dist2D(a: { x: number; y: number }, b: { x: number; y: number }): numbe
 	return Math.sqrt(dx * dx + dy * dy);
 }
 
+// ---------- theme ----------
+interface ThemeColors {
+	panelBg: string;         // tooltip bg, minimap bg
+	labelPillBg: string;     // local label pill bg (more transparent)
+	panelBorder: string;     // borders on tooltips, minimap, controls
+	text: string;            // primary text (labels, tooltips)
+	textMuted: string;       // empty-state text, dimmed elements
+	minimapDimPoint: string; // non-local minimap points
+	linkStroke: string;      // link edges (global)
+	linkStrokeLocal: string; // link edges (local)
+	connectorLine: string;   // label connector lines
+}
+
+const DARK: ThemeColors = {
+	panelBg: "rgba(15,15,26,0.92)",
+	labelPillBg: "rgba(15,15,26,0.75)",
+	panelBorder: "rgba(44,44,58,0.6)",
+	text: "#D6D6E0",
+	textMuted: "#8E9AAF",
+	minimapDimPoint: "rgba(142,154,175,0.45)",
+	linkStroke: "rgba(214,214,224,0.18)",
+	linkStrokeLocal: "rgba(214,214,224,0.15)",
+	connectorLine: "rgba(142,154,175,0.2)",
+};
+
+const LIGHT: ThemeColors = {
+	panelBg: "rgba(255,255,255,0.92)",
+	labelPillBg: "rgba(255,255,255,0.78)",
+	panelBorder: "rgba(160,160,180,0.4)",
+	text: "#1e1e2e",
+	textMuted: "#6e6e80",
+	minimapDimPoint: "rgba(100,100,120,0.4)",
+	linkStroke: "rgba(60,60,80,0.22)",
+	linkStrokeLocal: "rgba(60,60,80,0.18)",
+	connectorLine: "rgba(100,100,120,0.25)",
+};
+
 // ---------- view ----------
 export class ChorographiaView extends ItemView {
 	plugin: ChorographiaPlugin;
@@ -123,6 +161,10 @@ export class ChorographiaView extends ItemView {
 	constructor(leaf: WorkspaceLeaf, plugin: ChorographiaPlugin) {
 		super(leaf);
 		this.plugin = plugin;
+	}
+
+	private get theme(): ThemeColors {
+		return document.body.classList.contains("theme-light") ? LIGHT : DARK;
 	}
 
 	getViewType() { return VIEW_TYPE; }
@@ -400,6 +442,8 @@ export class ChorographiaView extends ItemView {
 				llmNames = await generateZoneNamesOllama(clusters, this.plugin.settings.ollamaUrl, this.plugin.settings.ollamaLlmModel);
 			} else if (this.plugin.settings.llmProvider === "openai" && this.plugin.settings.openaiApiKey) {
 				llmNames = await generateZoneNames(clusters, this.plugin.settings.openaiApiKey);
+			} else if (this.plugin.settings.llmProvider === "openrouter" && this.plugin.settings.openrouterApiKey) {
+				llmNames = await generateZoneNamesOpenRouter(clusters, this.plugin.settings.openrouterApiKey, this.plugin.settings.openrouterLlmModel);
 			}
 			for (const [idx, name] of llmNames) {
 				labelMap[idx] = name;
@@ -471,6 +515,8 @@ export class ChorographiaView extends ItemView {
 				llmNames = await generateZoneNamesOllama(batchClusters, this.plugin.settings.ollamaUrl, this.plugin.settings.ollamaLlmModel);
 			} else if (this.plugin.settings.llmProvider === "openai" && this.plugin.settings.openaiApiKey) {
 				llmNames = await generateZoneNames(batchClusters, this.plugin.settings.openaiApiKey);
+			} else if (this.plugin.settings.llmProvider === "openrouter" && this.plugin.settings.openrouterApiKey) {
+				llmNames = await generateZoneNamesOpenRouter(batchClusters, this.plugin.settings.openrouterApiKey, this.plugin.settings.openrouterLlmModel);
 			}
 			for (const [batchIdx, name] of llmNames) {
 				const c = allSubClusters[batchIdx];
@@ -631,8 +677,10 @@ export class ChorographiaView extends ItemView {
 		ctx.clearRect(0, 0, W, H);
 
 		const pts = this.points;
+		const th = this.theme;
+
 		if (!pts.length) {
-			ctx.fillStyle = "#8E9AAF";
+			ctx.fillStyle = th.textMuted;
 			ctx.font = "15px var(--font-interface)";
 			ctx.textAlign = "center";
 			ctx.fillText("No points. Run re-embed + recompute layout in settings.", W / 2, H / 2);
@@ -676,7 +724,7 @@ export class ChorographiaView extends ItemView {
 		// ---------- links ----------
 		if (showLinks) {
 			ctx.save();
-			ctx.strokeStyle = isLocal ? "rgba(214,214,224,0.15)" : "rgba(214,214,224,0.18)";
+			ctx.strokeStyle = isLocal ? th.linkStrokeLocal : th.linkStroke;
 			ctx.lineWidth = isLocal ? 0.8 : 1;
 			for (let i = 0; i < pts.length; i++) {
 				for (const link of pts[i].links) {
@@ -815,6 +863,7 @@ export class ChorographiaView extends ItemView {
 	// ---------- labels ----------
 
 	private drawLocalLabels(ctx: CanvasRenderingContext2D, pts: MapPoint[], scr: ScreenPt[], baseR: number) {
+		const th = this.theme;
 		// Place labels using angle from center-of-mass to avoid overlap
 		const comX = scr.reduce((s, p) => s + p.x, 0) / scr.length;
 		const comY = scr.reduce((s, p) => s + p.y, 0) / scr.length;
@@ -867,7 +916,7 @@ export class ChorographiaView extends ItemView {
 			const isSel = i === this.selectedIdx;
 
 			// pill background
-			ctx.fillStyle = isSel ? "rgba(201,150,59,0.18)" : "rgba(15,15,26,0.75)";
+			ctx.fillStyle = isSel ? "rgba(201,150,59,0.18)" : th.labelPillBg;
 			ctx.beginPath();
 			ctx.roundRect(bestX, bestY, bw, bh, 4);
 			ctx.fill();
@@ -880,14 +929,14 @@ export class ChorographiaView extends ItemView {
 			}
 
 			// text
-			ctx.fillStyle = isSel ? "#C9963B" : "#D6D6E0";
+			ctx.fillStyle = isSel ? "#C9963B" : th.text;
 			ctx.globalAlpha = isSel ? 1 : 0.88;
 			ctx.textAlign = "left";
 			ctx.fillText(label, bestX + pad, bestY + fontSize + pad - 2);
 			ctx.globalAlpha = 1;
 
 			// connector line
-			ctx.strokeStyle = "rgba(142,154,175,0.2)";
+			ctx.strokeStyle = th.connectorLine;
 			ctx.lineWidth = 0.5;
 			ctx.beginPath();
 			ctx.moveTo(s.x, s.y);
@@ -900,7 +949,7 @@ export class ChorographiaView extends ItemView {
 		ctx.save();
 		ctx.globalAlpha = alpha;
 		ctx.font = "9px var(--font-interface)";
-		ctx.fillStyle = "#D6D6E0";
+		ctx.fillStyle = this.theme.text;
 		ctx.textAlign = "left";
 		for (let i = 0; i < pts.length; i++) {
 			const s = scr[i];
@@ -913,21 +962,22 @@ export class ChorographiaView extends ItemView {
 
 	// ---------- tooltip ----------
 	private drawTooltip(ctx: CanvasRenderingContext2D, s: ScreenPt, title: string) {
+		const th = this.theme;
 		const label = title.length > 60 ? title.slice(0, 57) + "..." : title;
 		ctx.font = "12px var(--font-interface)";
 		const tw = ctx.measureText(label).width;
 		const pad = 7;
 		const tx = s.x + 14, ty = s.y - 14;
 
-		ctx.fillStyle = "rgba(15,15,26,0.92)";
+		ctx.fillStyle = th.panelBg;
 		ctx.beginPath();
 		ctx.roundRect(tx - pad, ty - 15, tw + pad * 2, 22, 5);
 		ctx.fill();
-		ctx.strokeStyle = "rgba(44,44,58,0.6)";
+		ctx.strokeStyle = th.panelBorder;
 		ctx.lineWidth = 1;
 		ctx.stroke();
 
-		ctx.fillStyle = "#D6D6E0";
+		ctx.fillStyle = th.text;
 		ctx.textAlign = "left";
 		ctx.fillText(label, tx, ty);
 	}
@@ -969,9 +1019,10 @@ export class ChorographiaView extends ItemView {
 		else { ox = pad; oy = H - size - pad; } // bottom-left
 
 		// background
+		const th = this.theme;
 		ctx.save();
-		ctx.fillStyle = "rgba(15,15,30,0.88)";
-		ctx.strokeStyle = "rgba(44,44,58,0.6)";
+		ctx.fillStyle = th.panelBg;
+		ctx.strokeStyle = th.panelBorder;
 		ctx.lineWidth = 1;
 		ctx.beginPath();
 		ctx.roundRect(ox, oy, size, size, 6);
@@ -1007,7 +1058,7 @@ export class ChorographiaView extends ItemView {
 			const inLocal = localPaths.has(p.path);
 			ctx.beginPath();
 			ctx.arc(sx, sy, inLocal ? 3 : 1.5, 0, Math.PI * 2);
-			ctx.fillStyle = inLocal ? this.color(p) : "rgba(142,154,175,0.45)";
+			ctx.fillStyle = inLocal ? this.color(p) : th.minimapDimPoint;
 			ctx.globalAlpha = inLocal ? 1 : 0.7;
 			ctx.fill();
 		}

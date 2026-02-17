@@ -8,6 +8,7 @@ import { PluginCache, NoteCache } from "./cache";
 import { indexVault } from "./indexer";
 import { embedTexts } from "./openai";
 import { embedTextsOllama } from "./ollama";
+import { embedTextsOpenRouter } from "./openrouter";
 import { importSmartConnectionsEmbeddings } from "./smartconnections";
 import { computeLayout } from "./layout";
 import { kMeans, computeSemanticAssignments } from "./kmeans";
@@ -154,6 +155,7 @@ export default class ChorographiaPlugin extends Plugin {
 		switch (this.settings.embeddingProvider) {
 			case "ollama": return `ollama:${this.settings.ollamaEmbedModel}`;
 			case "openai": return `openai:${this.settings.embeddingModel}`;
+			case "openrouter": return `openrouter:${this.settings.openrouterEmbedModel}`;
 			case "smart-connections": return "smart-connections";
 		}
 	}
@@ -162,6 +164,10 @@ export default class ChorographiaPlugin extends Plugin {
 		// Validate per-provider requirements
 		if (this.settings.embeddingProvider === "openai" && !this.settings.openaiApiKey) {
 			new Notice("Chorographia: Set your OpenAI API key in settings first.");
+			return;
+		}
+		if (this.settings.embeddingProvider === "openrouter" && !this.settings.openrouterApiKey) {
+			new Notice("Chorographia: Set your OpenRouter API key in settings first.");
 			return;
 		}
 
@@ -236,6 +242,9 @@ export default class ChorographiaPlugin extends Plugin {
 				break;
 			case "openai":
 				results = await embedTexts(toEmbed, this.settings.openaiApiKey, this.settings.embeddingModel, onProgress);
+				break;
+			case "openrouter":
+				results = await embedTextsOpenRouter(toEmbed, this.settings.openrouterApiKey, this.settings.openrouterEmbedModel, onProgress);
 				break;
 			case "smart-connections":
 				results = await importSmartConnectionsEmbeddings(this.app, toEmbed.map((t) => t.path));

@@ -6,13 +6,16 @@ export type ColorMode = "semantic" | "folder" | "type" | "cat";
 export type MinimapCorner = "top-left" | "top-right" | "bottom-left" | "bottom-right";
 
 export interface ChorographiaSettings {
-	embeddingProvider: "ollama" | "openai" | "smart-connections";
+	embeddingProvider: "ollama" | "openai" | "openrouter" | "smart-connections";
 	ollamaUrl: string;
 	ollamaEmbedModel: string;
 	ollamaLlmModel: string;
-	llmProvider: "ollama" | "openai";
+	llmProvider: "ollama" | "openai" | "openrouter";
 	openaiApiKey: string;
 	embeddingModel: string;
+	openrouterApiKey: string;
+	openrouterEmbedModel: string;
+	openrouterLlmModel: string;
 	includeGlobs: string;
 	excludeGlobs: string;
 	maxNotes: number;
@@ -33,6 +36,9 @@ export const DEFAULT_SETTINGS: ChorographiaSettings = {
 	llmProvider: "ollama",
 	openaiApiKey: "",
 	embeddingModel: "text-embedding-3-large",
+	openrouterApiKey: "",
+	openrouterEmbedModel: "openai/text-embedding-3-small",
+	openrouterLlmModel: "google/gemini-2.0-flash-001",
 	includeGlobs: "**/*.md",
 	excludeGlobs: "templates/**",
 	maxNotes: 2000,
@@ -57,16 +63,92 @@ export class ChorographiaSettingTab extends PluginSettingTab {
 		const { containerEl } = this;
 		containerEl.empty();
 
+		const needsOllama =
+			this.plugin.settings.embeddingProvider === "ollama" ||
+			this.plugin.settings.llmProvider === "ollama";
+		const needsOpenAI =
+			this.plugin.settings.embeddingProvider === "openai" ||
+			this.plugin.settings.llmProvider === "openai";
+		const needsOpenRouter =
+			this.plugin.settings.embeddingProvider === "openrouter" ||
+			this.plugin.settings.llmProvider === "openrouter";
+
+		// ======== Providers ========
+		if (needsOllama || needsOpenAI || needsOpenRouter) {
+			containerEl.createEl("h3", { text: "Providers" });
+			containerEl.createEl("p", {
+				text: "Connection details for services used by embedding or zone naming below.",
+				cls: "setting-item-description",
+			});
+
+			if (needsOllama) {
+				new Setting(containerEl)
+					.setName("Ollama URL")
+					.setDesc("Base URL for the local Ollama server.")
+					.addText((text) =>
+						text
+							.setPlaceholder("http://localhost:11434")
+							.setValue(this.plugin.settings.ollamaUrl)
+							.onChange(async (value) => {
+								this.plugin.settings.ollamaUrl = value;
+								await this.plugin.saveSettings();
+							})
+							.then((t) => { t.inputEl.style.width = "250px"; })
+					);
+			}
+
+			if (needsOpenAI) {
+				new Setting(containerEl)
+					.setName("OpenAI API key")
+					.addText((text) =>
+						text
+							.setPlaceholder("sk-...")
+							.setValue(this.plugin.settings.openaiApiKey)
+							.onChange(async (value) => {
+								this.plugin.settings.openaiApiKey = value;
+								await this.plugin.saveSettings();
+							})
+							.then((t) => {
+								t.inputEl.type = "password";
+								t.inputEl.style.width = "300px";
+							})
+					);
+			}
+
+			if (needsOpenRouter) {
+				new Setting(containerEl)
+					.setName("OpenRouter API key")
+					.setDesc("Get one at openrouter.ai/keys.")
+					.addText((text) =>
+						text
+							.setPlaceholder("sk-or-...")
+							.setValue(this.plugin.settings.openrouterApiKey)
+							.onChange(async (value) => {
+								this.plugin.settings.openrouterApiKey = value;
+								await this.plugin.saveSettings();
+							})
+							.then((t) => {
+								t.inputEl.type = "password";
+								t.inputEl.style.width = "300px";
+							})
+					);
+			}
+		}
+
 		// ======== Embedding ========
 		containerEl.createEl("h3", { text: "Embedding" });
+		containerEl.createEl("p", {
+			text: "Choose how note content is converted into vectors for the map layout.",
+			cls: "setting-item-description",
+		});
 
 		new Setting(containerEl)
 			.setName("Provider")
-			.setDesc("Source for computing note embeddings.")
 			.addDropdown((dd) =>
 				dd
 					.addOption("ollama", "Ollama (local)")
 					.addOption("openai", "OpenAI")
+					.addOption("openrouter", "OpenRouter")
 					.addOption("smart-connections", "Smart Connections")
 					.setValue(this.plugin.settings.embeddingProvider)
 					.onChange(async (value) => {
@@ -78,21 +160,8 @@ export class ChorographiaSettingTab extends PluginSettingTab {
 
 		if (this.plugin.settings.embeddingProvider === "ollama") {
 			new Setting(containerEl)
-				.setName("Ollama URL")
-				.setDesc("Base URL for the Ollama server.")
-				.addText((text) =>
-					text
-						.setPlaceholder("http://localhost:11434")
-						.setValue(this.plugin.settings.ollamaUrl)
-						.onChange(async (value) => {
-							this.plugin.settings.ollamaUrl = value;
-							await this.plugin.saveSettings();
-						})
-						.then((t) => { t.inputEl.style.width = "250px"; })
-				);
-			new Setting(containerEl)
 				.setName("Embedding model")
-				.setDesc("Ollama model for embeddings (e.g. qwen3-embedding).")
+				.setDesc("Ollama model name (e.g. qwen3-embedding).")
 				.addText((text) =>
 					text
 						.setValue(this.plugin.settings.ollamaEmbedModel)
@@ -103,29 +172,25 @@ export class ChorographiaSettingTab extends PluginSettingTab {
 				);
 		} else if (this.plugin.settings.embeddingProvider === "openai") {
 			new Setting(containerEl)
-				.setName("OpenAI API key")
-				.setDesc("Required for OpenAI embeddings.")
-				.addText((text) =>
-					text
-						.setPlaceholder("sk-...")
-						.setValue(this.plugin.settings.openaiApiKey)
-						.onChange(async (value) => {
-							this.plugin.settings.openaiApiKey = value;
-							await this.plugin.saveSettings();
-						})
-						.then((t) => {
-							t.inputEl.type = "password";
-							t.inputEl.style.width = "300px";
-						})
-				);
-			new Setting(containerEl)
 				.setName("Embedding model")
-				.setDesc("OpenAI embedding model to use.")
+				.setDesc("OpenAI model name (e.g. text-embedding-3-large).")
 				.addText((text) =>
 					text
 						.setValue(this.plugin.settings.embeddingModel)
 						.onChange(async (value) => {
 							this.plugin.settings.embeddingModel = value;
+							await this.plugin.saveSettings();
+						})
+				);
+		} else if (this.plugin.settings.embeddingProvider === "openrouter") {
+			new Setting(containerEl)
+				.setName("Embedding model")
+				.setDesc("OpenRouter model ID (e.g. openai/text-embedding-3-small).")
+				.addText((text) =>
+					text
+						.setValue(this.plugin.settings.openrouterEmbedModel)
+						.onChange(async (value) => {
+							this.plugin.settings.openrouterEmbedModel = value;
 							await this.plugin.saveSettings();
 						})
 				);
@@ -184,6 +249,10 @@ export class ChorographiaSettingTab extends PluginSettingTab {
 
 		// ======== Semantic Zones ========
 		containerEl.createEl("h3", { text: "Semantic Zones" });
+		containerEl.createEl("p", {
+			text: "Group nearby notes into labeled regions on the map using k-means clustering.",
+			cls: "setting-item-description",
+		});
 
 		new Setting(containerEl)
 			.setName("Show semantic zones")
@@ -202,7 +271,7 @@ export class ChorographiaSettingTab extends PluginSettingTab {
 		if (this.plugin.settings.showZones) {
 			new Setting(containerEl)
 				.setName("Zone granularity")
-				.setDesc("Number of zone clusters (3–24). Higher = more, smaller zones.")
+				.setDesc("Number of zone clusters (3\u201324). Higher = more, smaller zones.")
 				.addDropdown((dd) => {
 					for (let n = 3; n <= 24; n++)
 						dd.addOption(String(n), String(n));
@@ -231,11 +300,11 @@ export class ChorographiaSettingTab extends PluginSettingTab {
 			if (this.plugin.settings.enableLLMZoneNaming) {
 				new Setting(containerEl)
 					.setName("Zone naming provider")
-					.setDesc("LLM used to generate zone names.")
 					.addDropdown((dd) =>
 						dd
 							.addOption("ollama", "Ollama (local)")
 							.addOption("openai", "OpenAI")
+							.addOption("openrouter", "OpenRouter")
 							.setValue(this.plugin.settings.llmProvider)
 							.onChange(async (value) => {
 								this.plugin.settings.llmProvider = value as any;
@@ -245,21 +314,6 @@ export class ChorographiaSettingTab extends PluginSettingTab {
 					);
 
 				if (this.plugin.settings.llmProvider === "ollama") {
-					if (this.plugin.settings.embeddingProvider !== "ollama") {
-						new Setting(containerEl)
-							.setName("Ollama URL")
-							.setDesc("Base URL for the Ollama server.")
-							.addText((text) =>
-								text
-									.setPlaceholder("http://localhost:11434")
-									.setValue(this.plugin.settings.ollamaUrl)
-									.onChange(async (value) => {
-										this.plugin.settings.ollamaUrl = value;
-										await this.plugin.saveSettings();
-									})
-									.then((t) => { t.inputEl.style.width = "250px"; })
-							);
-					}
 					new Setting(containerEl)
 						.setName("LLM model")
 						.setDesc("Ollama model for zone naming (e.g. qwen3:8b).")
@@ -271,25 +325,18 @@ export class ChorographiaSettingTab extends PluginSettingTab {
 									await this.plugin.saveSettings();
 								})
 						);
-				} else if (this.plugin.settings.llmProvider === "openai") {
-					if (this.plugin.settings.embeddingProvider !== "openai") {
-						new Setting(containerEl)
-							.setName("OpenAI API key")
-							.setDesc("Required for OpenAI zone naming.")
-							.addText((text) =>
-								text
-									.setPlaceholder("sk-...")
-									.setValue(this.plugin.settings.openaiApiKey)
-									.onChange(async (value) => {
-										this.plugin.settings.openaiApiKey = value;
-										await this.plugin.saveSettings();
-									})
-									.then((t) => {
-										t.inputEl.type = "password";
-										t.inputEl.style.width = "300px";
-									})
-							);
-					}
+				} else if (this.plugin.settings.llmProvider === "openrouter") {
+					new Setting(containerEl)
+						.setName("LLM model")
+						.setDesc("OpenRouter model ID (e.g. google/gemini-2.0-flash-001).")
+						.addText((text) =>
+							text
+								.setValue(this.plugin.settings.openrouterLlmModel)
+								.onChange(async (value) => {
+									this.plugin.settings.openrouterLlmModel = value;
+									await this.plugin.saveSettings();
+								})
+						);
 				}
 
 				new Setting(containerEl)
@@ -314,6 +361,10 @@ export class ChorographiaSettingTab extends PluginSettingTab {
 
 		// ======== Map Display ========
 		containerEl.createEl("h3", { text: "Map Display" });
+		containerEl.createEl("p", {
+			text: "Visual appearance of the map canvas and file explorer integration.",
+			cls: "setting-item-description",
+		});
 
 		new Setting(containerEl)
 			.setName("Color mode")

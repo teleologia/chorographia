@@ -149,3 +149,48 @@
 	transform: translateX(16px);
 	background: #5AC6CE;
 }
+
+/* ========== Light theme overrides ========== */
+
+.theme-light .chorographia-container {
+	background: linear-gradient(135deg, #e8e8f0 0%, #f0f0f8 50%, #f8f8ff 100%);
+}
+
+.theme-light .chorographia-status {
+	color: #6e6e80;
+	background: rgba(255, 255, 255, 0.85);
+	border-color: rgba(160, 160, 180, 0.4);
+}
+
+.theme-light .chorographia-controls {
+	color: #1e1e2e;
+	background: rgba(255, 255, 255, 0.88);
+	border-color: rgba(160, 160, 180, 0.4);
+}
+
+.theme-light .chorographia-controls select {
+	background: rgba(240, 240, 248, 0.95);
+	color: #1e1e2e;
+	border-color: rgba(160, 160, 180, 0.5);
+}
+
+.theme-light .chorographia-sep {
+	background: rgba(100, 100, 120, 0.25);
+}
+
+.theme-light .chorographia-view-switch .switch-label {
+	color: #6e6e80;
+}
+
+.theme-light .chorographia-view-switch .switch-label.is-active {
+	color: #1e1e2e;
+}
+
+.theme-light .chorographia-view-switch .switch-track {
+	background: rgba(220, 220, 235, 0.9);
+	border-color: rgba(160, 160, 180, 0.5);
+}
+
+.theme-light .chorographia-view-switch .switch-thumb {
+	background: #8E9AAF;
+}
