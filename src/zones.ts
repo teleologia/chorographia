@@ -1,4 +1,8 @@
-import { SEM_PALETTE } from "./colors";
+const SEM_PALETTE = [
+	"#00D6FF", "#B9FF00", "#FF7A00", "#A855F7",
+	"#00FFB3", "#FF3DB8", "#00FFA3", "#FFD400",
+	"#00F5D4", "#FF9A3D", "#7CFFCB", "#B8C0FF",
+];
 
 export interface Zone {
 	id: number;

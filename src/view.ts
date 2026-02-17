@@ -1,12 +1,11 @@
 import { ItemView, WorkspaceLeaf, Notice } from "obsidian";
 import type ChorographiaPlugin from "./main";
 import type { NoteCache, ZoneCacheEntry } from "./cache";
-import { decodeFloat32 } from "./cache";
-import { kMeans } from "./kmeans";
+import { decodeFloat32, encodeFloat32 } from "./cache";
+import { kMeans, computeSemanticAssignments } from "./kmeans";
 import { Zone, computeZones, drawZone, transformZoneToLocal } from "./zones";
 import { generateZoneNames } from "./zoneNaming";
 import { generateZoneNamesOllama } from "./ollama";
-import { SEM_PALETTE, FOLDER_COLORS, SEM_SPLIT, TYPE_COLORS, lerpColor } from "./colors";
 
 export const VIEW_TYPE = "chorographia-map";
 
@@ -18,7 +17,6 @@ interface MapPoint {
 	y: number;
 	title: string;
 	folder: string;
-	semK: string;
 	semA: number;
 	semB: number;
 	semW: number;
@@ -29,8 +27,41 @@ interface MapPoint {
 
 interface ScreenPt { x: number; y: number }
 
+// ---------- palettes ----------
+const FOLDER_COLORS = [
+	"#8E9AAF", "#C9963B", "#B28DFF", "#5AC6CE", "#B8541A",
+	"#9AB2AF", "#BCDC2B", "#FF7A00", "#A855F7", "#00D6FF",
+	"#00FFB3", "#FF3DB8",
+];
+const SEM_PALETTE = [
+	"#00D6FF", "#B9FF00", "#FF7A00", "#A855F7",
+	"#00FFB3", "#FF3DB8", "#00FFA3", "#FFD400",
+	"#00F5D4", "#FF9A3D", "#7CFFCB", "#B8C0FF",
+];
+const SEM_SPLIT: Record<number, number> = { 1: 0.80, 2: 0.65, 3: 0.50, 4: 0.35, 5: 0.20 };
+const TYPE_COLORS: Record<string, string> = {
+	SRC: "#8E9AAF", LIT: "#C9963B", SEED: "#B8541A",
+	EVE: "#B28DFF", REV: "#9AB2AF", NOTE: "#5AC6CE",
+};
 const NEIGHBOR_OPTIONS = [5, 10, 15, 20];
 
+// ---------- helpers ----------
+function hexToRgb(hex: string): [number, number, number] {
+	const n = parseInt(hex.slice(1), 16);
+	return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+function rgbToHex(r: number, g: number, b: number): string {
+	return "#" + ((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1);
+}
+function lerpColor(c1: string, c2: string, t: number): string {
+	const [r1, g1, b1] = hexToRgb(c1);
+	const [r2, g2, b2] = hexToRgb(c2);
+	return rgbToHex(
+		Math.round(r1 + (r2 - r1) * t),
+		Math.round(g1 + (g2 - g1) * t),
+		Math.round(b1 + (b2 - b1) * t),
+	);
+}
 function hashStr(s: string): number {
 	let h = 0;
 	for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
@@ -215,7 +246,6 @@ export class ChorographiaView extends ItemView {
 			const p: MapPoint = {
 				path, x: n.x, y: n.y,
 				title: n.title, folder: n.folder,
-				semK: n.semK || "",
 				semA: n.semA ?? -1, semB: n.semB ?? -1, semW: n.semW ?? 3,
 				noteType: n.noteType || "", cat: n.cat || "",
 				links: n.links || [],
@@ -287,6 +317,30 @@ export class ChorographiaView extends ItemView {
 						}
 					}
 				}
+				// Recompute semantic assignments from cached centroids
+				if (cached.centroids && cached.centroids.length > 0) {
+					const cachedCentroids = cached.centroids.map((c) => decodeFloat32(c));
+					const vecs: Float32Array[] = [];
+					const vecPaths: string[] = [];
+					for (const p of this.allPoints) {
+						const note = this.plugin.cache.notes[p.path];
+						if (note?.embedding) {
+							vecs.push(decodeFloat32(note.embedding));
+							vecPaths.push(p.path);
+						}
+					}
+					if (vecs.length > 0) {
+						const semAssign = computeSemanticAssignments(vecs, cachedCentroids);
+						for (let i = 0; i < vecPaths.length; i++) {
+							const note = this.plugin.cache.notes[vecPaths[i]];
+							if (note) {
+								note.semA = semAssign[i].semA;
+								note.semB = semAssign[i].semB;
+								note.semW = semAssign[i].semW;
+							}
+						}
+					}
+				}
 				return;
 			}
 		}
@@ -309,7 +363,7 @@ export class ChorographiaView extends ItemView {
 		}
 
 		// Run k-means
-		const assignments = kMeans(vectors, k);
+		const { assignments, centroids } = kMeans(vectors, k);
 
 		// Build assignment map for cache
 		const assignMap: Record<string, number> = {};
@@ -374,7 +428,7 @@ export class ChorographiaView extends ItemView {
 			}
 			if (memberVecs.length < localK) continue;
 
-			const subAssignments = kMeans(memberVecs, localK);
+			const { assignments: subAssignments } = kMeans(memberVecs, localK);
 			const subAssignMap: Record<string, number> = {};
 			for (let i = 0; i < memberPaths.length; i++) subAssignMap[memberPaths[i]] = subAssignments[i];
 			subAssignmentsCache[zone.id] = subAssignMap;
@@ -435,6 +489,7 @@ export class ChorographiaView extends ItemView {
 			assignments: assignMap,
 			labels: labelMap,
 			llmEnhanced: this.plugin.settings.enableLLMZoneNaming,
+			centroids: centroids.map((c) => encodeFloat32(c)),
 			subAssignments: subAssignmentsCache,
 			subLabels: subLabelsCache,
 		};

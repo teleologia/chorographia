@@ -1,4 +1,13 @@
-import { mulberry32 } from "./rng";
+// Mulberry32 deterministic PRNG (same as layout.ts)
+function mulberry32(seed: number): () => number {
+	return () => {
+		seed |= 0;
+		seed = (seed + 0x6d2b79f5) | 0;
+		let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+		t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+		return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+	};
+}
 
 function euclideanDist(a: Float32Array, b: Float32Array): number {
 	let sum = 0;
@@ -22,14 +31,25 @@ function nearestCenter(v: Float32Array, centers: Float32Array[]): { idx: number;
 	return { idx: bestIdx, dist: bestDist };
 }
 
+export interface KMeansResult {
+	assignments: number[];
+	centroids: Float32Array[];
+}
+
+export interface SemanticAssignment {
+	semA: number;  // nearest cluster
+	semB: number;  // second-nearest cluster
+	semW: number;  // weight bucket 1-5 (1=strongly A, 5=strongly B)
+}
+
 /**
  * K-means clustering with k-means++ initialization.
- * Returns cluster assignment index per vector.
+ * Returns cluster assignments and final centroids.
  */
-export function kMeans(vectors: Float32Array[], k: number, seed = 42): number[] {
+export function kMeans(vectors: Float32Array[], k: number, seed = 42): KMeansResult {
 	const n = vectors.length;
-	if (n === 0) return [];
-	if (k >= n) return vectors.map((_, i) => i);
+	if (n === 0) return { assignments: [], centroids: [] };
+	if (k >= n) return { assignments: vectors.map((_, i) => i), centroids: vectors.map((v) => new Float32Array(v)) };
 
 	const rng = mulberry32(seed);
 	const dim = vectors[0].length;
@@ -99,5 +119,36 @@ export function kMeans(vectors: Float32Array[], k: number, seed = 42): number[] 
 		}
 	}
 
-	return Array.from(assignments);
+	return { assignments: Array.from(assignments), centroids: centers };
+}
+
+/**
+ * For each vector, find the two nearest centroids and compute a weight bucket.
+ */
+export function computeSemanticAssignments(
+	vectors: Float32Array[],
+	centroids: Float32Array[]
+): SemanticAssignment[] {
+	if (centroids.length === 0) return vectors.map(() => ({ semA: -1, semB: -1, semW: 3 }));
+
+	return vectors.map((v) => {
+		let bestIdx = 0, bestDist = Infinity;
+		let secondIdx = 0, secondDist = Infinity;
+		for (let c = 0; c < centroids.length; c++) {
+			const d = euclideanDist(v, centroids[c]);
+			if (d < bestDist) {
+				secondDist = bestDist;
+				secondIdx = bestIdx;
+				bestDist = d;
+				bestIdx = c;
+			} else if (d < secondDist) {
+				secondDist = d;
+				secondIdx = c;
+			}
+		}
+		// ratio: 0 = exactly at A, 1 = equidistant (or closer to B shouldn't happen)
+		const ratio = secondDist > 0 ? bestDist / secondDist : 0;
+		const semW = ratio < 0.2 ? 1 : ratio < 0.4 ? 2 : ratio < 0.6 ? 3 : ratio < 0.8 ? 4 : 5;
+		return { semA: bestIdx, semB: secondIdx, semW };
+	});
 }

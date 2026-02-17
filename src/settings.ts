@@ -320,7 +320,7 @@ export class ChorographiaSettingTab extends PluginSettingTab {
 			.setDesc("How to color points on the map.")
 			.addDropdown((dd) =>
 				dd
-					.addOption("semantic", "Semantic (sem_k)")
+					.addOption("semantic", "Semantic")
 					.addOption("folder", "Folder")
 					.addOption("type", "Type (frontmatter)")
 					.addOption("cat", "Category (frontmatter)")

@@ -6,7 +6,6 @@ export interface NoteCache {
 	y?: number;
 	title: string;
 	folder: string;
-	semK?: string; // sem_k frontmatter value for coloring
 	semA?: number; // top-1 cluster index
 	semB?: number; // top-2 cluster index
 	semW?: number; // weight bucket (1-5): 1=mostly A, 5=mostly B
@@ -21,6 +20,7 @@ export interface ZoneCacheEntry {
 	assignments: Record<string, number>; // path → cluster index
 	labels: Record<number, string>; // cluster index → label
 	llmEnhanced: boolean;
+	centroids?: string[]; // base64-encoded Float32Arrays
 	subAssignments?: Record<number, Record<string, number>>; // globalZoneId → {path → subCluster}
 	subLabels?: Record<number, Record<number, string>>; // globalZoneId → {subCluster → label}
 }

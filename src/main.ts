@@ -10,8 +10,35 @@ import { embedTexts } from "./openai";
 import { embedTextsOllama } from "./ollama";
 import { importSmartConnectionsEmbeddings } from "./smartconnections";
 import { computeLayout } from "./layout";
+import { kMeans, computeSemanticAssignments } from "./kmeans";
+import { decodeFloat32 } from "./cache";
 import { ChorographiaView, VIEW_TYPE } from "./view";
-import { SEM_PALETTE, FOLDER_COLORS, SEM_SPLIT, lerpColor } from "./colors";
+
+// Same palette as view.ts — used for explorer dots
+const SEM_PALETTE = [
+	"#00D6FF", "#B9FF00", "#FF7A00", "#A855F7",
+	"#00FFB3", "#FF3DB8", "#00FFA3", "#FFD400",
+	"#00F5D4", "#FF9A3D", "#7CFFCB", "#B8C0FF",
+];
+const FOLDER_COLORS = [
+	"#8E9AAF", "#C9963B", "#B28DFF", "#5AC6CE", "#B8541A",
+	"#9AB2AF", "#BCDC2B", "#FF7A00", "#A855F7", "#00D6FF",
+	"#00FFB3", "#FF3DB8",
+];
+const SEM_SPLIT: Record<number, number> = { 1: 0.80, 2: 0.65, 3: 0.50, 4: 0.35, 5: 0.20 };
+
+function hexToRgb(hex: string): [number, number, number] {
+	const n = parseInt(hex.slice(1), 16);
+	return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+function lerpHex(c1: string, c2: string, t: number): string {
+	const [r1, g1, b1] = hexToRgb(c1);
+	const [r2, g2, b2] = hexToRgb(c2);
+	const r = Math.round(r1 + (r2 - r1) * t);
+	const g = Math.round(g1 + (g2 - g1) * t);
+	const b = Math.round(b1 + (b2 - b1) * t);
+	return "#" + ((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1);
+}
 
 function noteColor(note: NoteCache, folderColors: Map<string, string>): string {
 	const semA = note.semA ?? -1;
@@ -21,7 +48,7 @@ function noteColor(note: NoteCache, folderColors: Map<string, string>): string {
 		const cA = SEM_PALETTE[semA % SEM_PALETTE.length];
 		if (semB < 0 || semA === semB) return cA;
 		const cB = SEM_PALETTE[semB % SEM_PALETTE.length];
-		return lerpColor(cA, cB, 1 - (SEM_SPLIT[semW] ?? 0.5));
+		return lerpHex(cA, cB, 1 - (SEM_SPLIT[semW] ?? 0.5));
 	}
 	return folderColors.get(note.folder) || FOLDER_COLORS[0];
 }
@@ -34,6 +61,12 @@ export default class ChorographiaPlugin extends Plugin {
 	async onload(): Promise<void> {
 		await this.loadSettings();
 		await this.loadCache();
+
+		// Migration: compute semantic colors if notes exist but have no semA yet
+		const noteEntries = Object.values(this.cache.notes);
+		if (noteEntries.length > 0 && noteEntries.some(n => n.embedding) && !noteEntries.some(n => n.semA != null)) {
+			await this.computeSemanticColors();
+		}
 
 		this.registerView(VIEW_TYPE, (leaf) => new ChorographiaView(leaf, this));
 
@@ -164,10 +197,6 @@ export default class ChorographiaPlugin extends Plugin {
 				// Update metadata even if embedding unchanged
 				cached.title = note.title;
 				cached.folder = note.folder;
-				cached.semK = note.semK;
-				cached.semA = note.semA;
-				cached.semB = note.semB;
-				cached.semW = note.semW;
 				cached.noteType = note.noteType;
 				cached.cat = note.cat;
 				cached.links = note.links;
@@ -224,10 +253,6 @@ export default class ChorographiaPlugin extends Plugin {
 				y: this.cache.notes[r.path]?.y,
 				title: note.title,
 				folder: note.folder,
-				semK: note.semK,
-				semA: note.semA,
-				semB: note.semB,
-				semW: note.semW,
 				noteType: note.noteType,
 				cat: note.cat,
 				links: note.links,
@@ -239,10 +264,6 @@ export default class ChorographiaPlugin extends Plugin {
 			if (this.cache.notes[note.path]) {
 				this.cache.notes[note.path].title = note.title;
 				this.cache.notes[note.path].folder = note.folder;
-				this.cache.notes[note.path].semK = note.semK;
-				this.cache.notes[note.path].semA = note.semA;
-				this.cache.notes[note.path].semB = note.semB;
-				this.cache.notes[note.path].semW = note.semW;
 				this.cache.notes[note.path].noteType = note.noteType;
 				this.cache.notes[note.path].cat = note.cat;
 				this.cache.notes[note.path].links = note.links;
@@ -251,6 +272,9 @@ export default class ChorographiaPlugin extends Plugin {
 
 		// Invalidate zone cache when embeddings change
 		this.cache.zones = {};
+
+		// Compute semantic colors from k-means clustering
+		await this.computeSemanticColors();
 
 		await this.saveCache();
 		this.refreshMapViews();
@@ -377,6 +401,9 @@ export default class ChorographiaPlugin extends Plugin {
 		// Invalidate zone cache when layout changes
 		this.cache.zones = {};
 
+		// Recompute semantic colors
+		await this.computeSemanticColors();
+
 		await this.saveCache();
 		new Notice("Chorographia: Layout computed.");
 
@@ -385,5 +412,30 @@ export default class ChorographiaPlugin extends Plugin {
 			(leaf.view as ChorographiaView).refresh();
 		}
 		this.updateExplorerDots();
+	}
+
+	async computeSemanticColors(): Promise<void> {
+		const paths: string[] = [];
+		const vectors: Float32Array[] = [];
+		for (const [path, note] of Object.entries(this.cache.notes)) {
+			if (note.embedding) {
+				paths.push(path);
+				vectors.push(decodeFloat32(note.embedding));
+			}
+		}
+		if (vectors.length === 0) return;
+
+		const k = Math.min(this.settings.zoneGranularity, vectors.length);
+		const { centroids } = kMeans(vectors, k);
+		const assignments = computeSemanticAssignments(vectors, centroids);
+
+		for (let i = 0; i < paths.length; i++) {
+			const note = this.cache.notes[paths[i]];
+			if (note) {
+				note.semA = assignments[i].semA;
+				note.semB = assignments[i].semB;
+				note.semW = assignments[i].semW;
+			}
+		}
 	}
 }

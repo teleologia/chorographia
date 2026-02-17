@@ -4,10 +4,6 @@ export interface IndexedNote {
 	path: string;
 	title: string;
 	folder: string;
-	semK: string;
-	semA: number;
-	semB: number;
-	semW: number;
 	noteType: string;
 	cat: string;
 	embedText: string;
@@ -77,11 +73,6 @@ export async function indexVault(
 		const topics = Array.isArray(fm.topics)
 			? fm.topics.map(String).join(", ")
 			: "";
-		const semK = fm.sem_k || "";
-		const semA = parseInt(fm.sem_a, 10);
-		const semB = parseInt(fm.sem_b, 10);
-		const semW = parseInt(fm.sem_w, 10);
-
 		const body = stripFrontmatter(content).slice(0, 12000);
 
 		const embedText = [
@@ -117,10 +108,6 @@ export async function indexVault(
 			path: file.path,
 			title,
 			folder,
-			semK,
-			semA: isNaN(semA) ? -1 : semA,
-			semB: isNaN(semB) ? -1 : semB,
-			semW: isNaN(semW) ? 3 : semW,
 			noteType: type,
 			cat,
 			embedText,
