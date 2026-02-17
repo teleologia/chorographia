@@ -1,0 +1,151 @@
+.chorographia-container {
+	position: relative;
+	width: 100%;
+	height: 100%;
+	overflow: hidden;
+	background: linear-gradient(135deg, #07070f 0%, #0f0f1a 50%, #1a1a2e 100%);
+}
+
+/* Prevent scrollbars in the Obsidian view pane */
+.view-content:has(.chorographia-container) {
+	overflow: hidden !important;
+	padding: 0 !important;
+}
+
+.workspace-leaf-content:has(.chorographia-container) .view-content {
+	overflow: hidden !important;
+	padding: 0 !important;
+}
+
+.chorographia-canvas {
+	display: block;
+	width: 100%;
+	height: 100%;
+	cursor: grab;
+}
+
+.chorographia-status {
+	position: absolute;
+	bottom: 12px;
+	left: 12px;
+	padding: 4px 10px;
+	font-size: 11px;
+	color: #8E9AAF;
+	background: rgba(15, 15, 26, 0.8);
+	border: 1px solid rgba(44, 44, 58, 0.6);
+	border-radius: 6px;
+	pointer-events: none;
+	font-family: var(--font-monospace);
+}
+
+.chorographia-controls {
+	position: absolute;
+	top: 12px;
+	right: 12px;
+	display: flex;
+	align-items: center;
+	padding: 4px 10px;
+	font-size: 11px;
+	color: #D6D6E0;
+	background: rgba(15, 15, 26, 0.85);
+	border: 1px solid rgba(44, 44, 58, 0.6);
+	border-radius: 6px;
+	font-family: var(--font-interface);
+	z-index: 10;
+}
+
+.chorographia-controls select {
+	background: rgba(26, 26, 46, 0.9);
+	color: #D6D6E0;
+	border: 1px solid rgba(44, 44, 58, 0.8);
+	border-radius: 4px;
+	padding: 2px 6px;
+	font-size: 11px;
+	font-family: var(--font-interface);
+	cursor: pointer;
+}
+
+.chorographia-sep {
+	display: inline-block;
+	width: 1px;
+	height: 14px;
+	background: rgba(142, 154, 175, 0.25);
+	margin: 0 8px;
+}
+
+.chorographia-toggle-label {
+	display: flex;
+	align-items: center;
+	gap: 3px;
+	cursor: pointer;
+	font-size: 11px;
+}
+
+.chorographia-toggle-label input[type="checkbox"] {
+	width: 13px;
+	height: 13px;
+	accent-color: #5AC6CE;
+	cursor: pointer;
+}
+
+.chorographia-neighbor-group {
+	display: inline-flex;
+	align-items: center;
+}
+
+.chorographia-zone-granularity {
+	display: inline-flex;
+	align-items: center;
+	margin-left: 4px;
+}
+
+.chorographia-view-switch {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	cursor: pointer;
+	-webkit-tap-highlight-color: transparent;
+	touch-action: manipulation;
+	user-select: none;
+}
+
+.chorographia-view-switch .switch-label {
+	font-size: 11px;
+	color: #8E9AAF;
+	transition: color 0.2s;
+}
+
+.chorographia-view-switch .switch-label.is-active {
+	color: #D6D6E0;
+}
+
+.chorographia-view-switch .switch-track {
+	position: relative;
+	width: 32px;
+	height: 16px;
+	background: rgba(26, 26, 46, 0.9);
+	border: 1px solid rgba(44, 44, 58, 0.8);
+	border-radius: 8px;
+	transition: background 0.2s, border-color 0.2s;
+}
+
+.chorographia-view-switch .switch-thumb {
+	position: absolute;
+	top: 2px;
+	left: 2px;
+	width: 10px;
+	height: 10px;
+	background: #8E9AAF;
+	border-radius: 50%;
+	transition: transform 0.2s, background 0.2s;
+}
+
+.chorographia-view-switch.is-local .switch-track {
+	background: rgba(90, 198, 206, 0.15);
+	border-color: rgba(90, 198, 206, 0.5);
+}
+
+.chorographia-view-switch.is-local .switch-thumb {
+	transform: translateX(16px);
+	background: #5AC6CE;
+}

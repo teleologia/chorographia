@@ -1,0 +1,432 @@
+import { App, PluginSettingTab, Setting, Notice } from "obsidian";
+import type ChorographiaPlugin from "./main";
+
+export type ColorMode = "semantic" | "folder" | "type" | "cat";
+
+export type MinimapCorner = "top-left" | "top-right" | "bottom-left" | "bottom-right";
+
+export interface ChorographiaSettings {
+	embeddingProvider: "ollama" | "openai" | "smart-connections";
+	ollamaUrl: string;
+	ollamaEmbedModel: string;
+	ollamaLlmModel: string;
+	llmProvider: "ollama" | "openai";
+	openaiApiKey: string;
+	embeddingModel: string;
+	includeGlobs: string;
+	excludeGlobs: string;
+	maxNotes: number;
+	showLinks: boolean;
+	colorMode: ColorMode;
+	showExplorerDots: boolean;
+	minimapCorner: MinimapCorner;
+	showZones: boolean;
+	zoneGranularity: number;
+	enableLLMZoneNaming: boolean;
+}
+
+export const DEFAULT_SETTINGS: ChorographiaSettings = {
+	embeddingProvider: "ollama",
+	ollamaUrl: "http://localhost:11434",
+	ollamaEmbedModel: "qwen3-embedding",
+	ollamaLlmModel: "qwen3:8b",
+	llmProvider: "ollama",
+	openaiApiKey: "",
+	embeddingModel: "text-embedding-3-large",
+	includeGlobs: "**/*.md",
+	excludeGlobs: "templates/**",
+	maxNotes: 2000,
+	showLinks: false,
+	colorMode: "semantic",
+	showExplorerDots: true,
+	minimapCorner: "bottom-left",
+	showZones: false,
+	zoneGranularity: 6,
+	enableLLMZoneNaming: false,
+};
+
+export class ChorographiaSettingTab extends PluginSettingTab {
+	plugin: ChorographiaPlugin;
+
+	constructor(app: App, plugin: ChorographiaPlugin) {
+		super(app, plugin);
+		this.plugin = plugin;
+	}
+
+	display(): void {
+		const { containerEl } = this;
+		containerEl.empty();
+
+		// ======== Embedding ========
+		containerEl.createEl("h3", { text: "Embedding" });
+
+		new Setting(containerEl)
+			.setName("Provider")
+			.setDesc("Source for computing note embeddings.")
+			.addDropdown((dd) =>
+				dd
+					.addOption("ollama", "Ollama (local)")
+					.addOption("openai", "OpenAI")
+					.addOption("smart-connections", "Smart Connections")
+					.setValue(this.plugin.settings.embeddingProvider)
+					.onChange(async (value) => {
+						this.plugin.settings.embeddingProvider = value as any;
+						await this.plugin.saveSettings();
+						this.display();
+					})
+			);
+
+		if (this.plugin.settings.embeddingProvider === "ollama") {
+			new Setting(containerEl)
+				.setName("Ollama URL")
+				.setDesc("Base URL for the Ollama server.")
+				.addText((text) =>
+					text
+						.setPlaceholder("http://localhost:11434")
+						.setValue(this.plugin.settings.ollamaUrl)
+						.onChange(async (value) => {
+							this.plugin.settings.ollamaUrl = value;
+							await this.plugin.saveSettings();
+						})
+						.then((t) => { t.inputEl.style.width = "250px"; })
+				);
+			new Setting(containerEl)
+				.setName("Embedding model")
+				.setDesc("Ollama model for embeddings (e.g. qwen3-embedding).")
+				.addText((text) =>
+					text
+						.setValue(this.plugin.settings.ollamaEmbedModel)
+						.onChange(async (value) => {
+							this.plugin.settings.ollamaEmbedModel = value;
+							await this.plugin.saveSettings();
+						})
+				);
+		} else if (this.plugin.settings.embeddingProvider === "openai") {
+			new Setting(containerEl)
+				.setName("OpenAI API key")
+				.setDesc("Required for OpenAI embeddings.")
+				.addText((text) =>
+					text
+						.setPlaceholder("sk-...")
+						.setValue(this.plugin.settings.openaiApiKey)
+						.onChange(async (value) => {
+							this.plugin.settings.openaiApiKey = value;
+							await this.plugin.saveSettings();
+						})
+						.then((t) => {
+							t.inputEl.type = "password";
+							t.inputEl.style.width = "300px";
+						})
+				);
+			new Setting(containerEl)
+				.setName("Embedding model")
+				.setDesc("OpenAI embedding model to use.")
+				.addText((text) =>
+					text
+						.setValue(this.plugin.settings.embeddingModel)
+						.onChange(async (value) => {
+							this.plugin.settings.embeddingModel = value;
+							await this.plugin.saveSettings();
+						})
+				);
+		} else if (this.plugin.settings.embeddingProvider === "smart-connections") {
+			new Setting(containerEl)
+				.setName("Smart Connections")
+				.setDesc("Imports embeddings from the Smart Connections plugin. Make sure it is installed and has generated embeddings.");
+		}
+
+		new Setting(containerEl)
+			.setName("Include globs")
+			.setDesc("Comma-separated glob patterns for notes to index.")
+			.addText((text) =>
+				text
+					.setPlaceholder("**/*.md")
+					.setValue(this.plugin.settings.includeGlobs)
+					.onChange(async (value) => {
+						this.plugin.settings.includeGlobs = value;
+						await this.plugin.saveSettings();
+					})
+					.then((t) => {
+						t.inputEl.style.width = "400px";
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("Exclude globs")
+			.setDesc("Comma-separated glob patterns for notes to skip.")
+			.addText((text) =>
+				text
+					.setPlaceholder("templates/**,daily/**")
+					.setValue(this.plugin.settings.excludeGlobs)
+					.onChange(async (value) => {
+						this.plugin.settings.excludeGlobs = value;
+						await this.plugin.saveSettings();
+					})
+					.then((t) => {
+						t.inputEl.style.width = "400px";
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("Max notes")
+			.setDesc("Safety cap on number of notes to index.")
+			.addText((text) =>
+				text
+					.setValue(String(this.plugin.settings.maxNotes))
+					.onChange(async (value) => {
+						const n = parseInt(value, 10);
+						if (!isNaN(n) && n > 0) {
+							this.plugin.settings.maxNotes = n;
+							await this.plugin.saveSettings();
+						}
+					})
+			);
+
+		// ======== Semantic Zones ========
+		containerEl.createEl("h3", { text: "Semantic Zones" });
+
+		new Setting(containerEl)
+			.setName("Show semantic zones")
+			.setDesc("Display thematic cluster regions behind points on the map.")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.showZones)
+					.onChange(async (value) => {
+						this.plugin.settings.showZones = value;
+						await this.plugin.saveSettings();
+						this.display();
+						this.plugin.refreshMapViews();
+					})
+			);
+
+		if (this.plugin.settings.showZones) {
+			new Setting(containerEl)
+				.setName("Zone granularity")
+				.setDesc("Number of zone clusters (3–24). Higher = more, smaller zones.")
+				.addDropdown((dd) => {
+					for (let n = 3; n <= 24; n++)
+						dd.addOption(String(n), String(n));
+					dd.setValue(String(this.plugin.settings.zoneGranularity));
+					dd.onChange(async (value) => {
+						this.plugin.settings.zoneGranularity = parseInt(value, 10);
+						await this.plugin.saveSettings();
+						this.plugin.refreshMapViews();
+					});
+				});
+
+			new Setting(containerEl)
+				.setName("LLM zone naming")
+				.setDesc("Use an LLM to generate evocative names for each zone.")
+				.addToggle((toggle) =>
+					toggle
+						.setValue(this.plugin.settings.enableLLMZoneNaming)
+						.onChange(async (value) => {
+							this.plugin.settings.enableLLMZoneNaming = value;
+							await this.plugin.saveSettings();
+							this.display();
+							this.plugin.refreshMapViews();
+						})
+				);
+
+			if (this.plugin.settings.enableLLMZoneNaming) {
+				new Setting(containerEl)
+					.setName("Zone naming provider")
+					.setDesc("LLM used to generate zone names.")
+					.addDropdown((dd) =>
+						dd
+							.addOption("ollama", "Ollama (local)")
+							.addOption("openai", "OpenAI")
+							.setValue(this.plugin.settings.llmProvider)
+							.onChange(async (value) => {
+								this.plugin.settings.llmProvider = value as any;
+								await this.plugin.saveSettings();
+								this.display();
+							})
+					);
+
+				if (this.plugin.settings.llmProvider === "ollama") {
+					if (this.plugin.settings.embeddingProvider !== "ollama") {
+						new Setting(containerEl)
+							.setName("Ollama URL")
+							.setDesc("Base URL for the Ollama server.")
+							.addText((text) =>
+								text
+									.setPlaceholder("http://localhost:11434")
+									.setValue(this.plugin.settings.ollamaUrl)
+									.onChange(async (value) => {
+										this.plugin.settings.ollamaUrl = value;
+										await this.plugin.saveSettings();
+									})
+									.then((t) => { t.inputEl.style.width = "250px"; })
+							);
+					}
+					new Setting(containerEl)
+						.setName("LLM model")
+						.setDesc("Ollama model for zone naming (e.g. qwen3:8b).")
+						.addText((text) =>
+							text
+								.setValue(this.plugin.settings.ollamaLlmModel)
+								.onChange(async (value) => {
+									this.plugin.settings.ollamaLlmModel = value;
+									await this.plugin.saveSettings();
+								})
+						);
+				} else if (this.plugin.settings.llmProvider === "openai") {
+					if (this.plugin.settings.embeddingProvider !== "openai") {
+						new Setting(containerEl)
+							.setName("OpenAI API key")
+							.setDesc("Required for OpenAI zone naming.")
+							.addText((text) =>
+								text
+									.setPlaceholder("sk-...")
+									.setValue(this.plugin.settings.openaiApiKey)
+									.onChange(async (value) => {
+										this.plugin.settings.openaiApiKey = value;
+										await this.plugin.saveSettings();
+									})
+									.then((t) => {
+										t.inputEl.type = "password";
+										t.inputEl.style.width = "300px";
+									})
+							);
+					}
+				}
+
+				new Setting(containerEl)
+					.setName("Re-run zone naming")
+					.setDesc("Regenerate LLM names for all zones and sub-zones.")
+					.addButton((btn) =>
+						btn.setButtonText("Run").onClick(async () => {
+							btn.setDisabled(true);
+							btn.setButtonText("Running...");
+							try {
+								await this.plugin.runZoneNaming();
+								new Notice("Chorographia: Zone naming complete.");
+							} catch (e: any) {
+								new Notice("Chorographia: " + e.message);
+							}
+							btn.setDisabled(false);
+							btn.setButtonText("Run");
+						})
+					);
+			}
+		}
+
+		// ======== Map Display ========
+		containerEl.createEl("h3", { text: "Map Display" });
+
+		new Setting(containerEl)
+			.setName("Color mode")
+			.setDesc("How to color points on the map.")
+			.addDropdown((dd) =>
+				dd
+					.addOption("semantic", "Semantic (sem_k)")
+					.addOption("folder", "Folder")
+					.addOption("type", "Type (frontmatter)")
+					.addOption("cat", "Category (frontmatter)")
+					.setValue(this.plugin.settings.colorMode)
+					.onChange(async (value) => {
+						this.plugin.settings.colorMode = value as ColorMode;
+						await this.plugin.saveSettings();
+						this.plugin.refreshMapViews();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("Show link overlay")
+			.setDesc("Draw wikilink edges between notes on the map.")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.showLinks)
+					.onChange(async (value) => {
+						this.plugin.settings.showLinks = value;
+						await this.plugin.saveSettings();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("File explorer dots")
+			.setDesc("Show colored semantic circles next to notes in the file explorer.")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.showExplorerDots)
+					.onChange(async (value) => {
+						this.plugin.settings.showExplorerDots = value;
+						await this.plugin.saveSettings();
+						this.plugin.updateExplorerDots();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("Minimap corner")
+			.setDesc("Corner for the global minimap shown in local view.")
+			.addDropdown((dd) =>
+				dd
+					.addOption("top-left", "Top-left")
+					.addOption("top-right", "Top-right")
+					.addOption("bottom-left", "Bottom-left")
+					.addOption("bottom-right", "Bottom-right")
+					.setValue(this.plugin.settings.minimapCorner)
+					.onChange(async (value) => {
+						this.plugin.settings.minimapCorner = value as MinimapCorner;
+						await this.plugin.saveSettings();
+						this.plugin.refreshMapViews();
+					})
+			);
+
+		// ======== Actions ========
+		containerEl.createEl("h3", { text: "Actions" });
+
+		new Setting(containerEl)
+			.setName("Re-embed changed notes")
+			.setDesc("Index notes and compute embeddings for new/changed notes.")
+			.addButton((btn) =>
+				btn.setButtonText("Run").onClick(async () => {
+					btn.setDisabled(true);
+					btn.setButtonText("Running...");
+					try {
+						await this.plugin.runEmbedPipeline();
+						new Notice("Chorographia: Embedding complete.");
+					} catch (e: any) {
+						new Notice("Chorographia: " + e.message);
+					}
+					btn.setDisabled(false);
+					btn.setButtonText("Run");
+				})
+			);
+
+		new Setting(containerEl)
+			.setName("Recompute layout")
+			.setDesc("Run UMAP on cached embeddings to produce a new 2D layout.")
+			.addButton((btn) =>
+				btn.setButtonText("Run").onClick(async () => {
+					btn.setDisabled(true);
+					btn.setButtonText("Running...");
+					try {
+						await this.plugin.runLayoutCompute();
+						new Notice("Chorographia: Layout computed.");
+					} catch (e: any) {
+						new Notice("Chorographia: " + e.message);
+					}
+					btn.setDisabled(false);
+					btn.setButtonText("Run");
+				})
+			);
+
+		new Setting(containerEl)
+			.setName("Clear cache")
+			.setDesc("Delete all cached embeddings and layout data.")
+			.addButton((btn) =>
+				btn
+					.setButtonText("Clear")
+					.setWarning()
+					.onClick(async () => {
+						if (confirm("Delete all Chorographia cached data?")) {
+							this.plugin.cache = { notes: {} };
+							await this.plugin.saveCache();
+							new Notice("Chorographia: Cache cleared.");
+						}
+					})
+			);
+	}
+}

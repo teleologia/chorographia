@@ -1,0 +1,19 @@
+{
+	"name": "chorographia",
+	"version": "0.1.0",
+	"description": "Semantic map of your vault",
+	"main": "main.js",
+	"scripts": {
+		"dev": "node esbuild.config.mjs",
+		"build": "node esbuild.config.mjs production"
+	},
+	"dependencies": {
+		"umap-js": "^1.4.0"
+	},
+	"devDependencies": {
+		"@types/node": "^20.11.0",
+		"esbuild": "^0.20.0",
+		"obsidian": "^1.5.0",
+		"typescript": "^5.3.0"
+	}
+}
