@@ -513,6 +513,24 @@ export class ChorographiaSettingTab extends PluginSettingTab {
 				})
 			);
 
+		new Setting(containerEl)
+			.setName("Recompute layout")
+			.setDesc("Run UMAP on cached embeddings to produce a new 2D layout.")
+			.addButton((btn) =>
+				btn.setButtonText("Run").onClick(async () => {
+					btn.setDisabled(true);
+					btn.setButtonText("Running...");
+					try {
+						await this.plugin.runLayoutCompute();
+						new Notice("Chorographia: Layout complete.");
+					} catch (e: any) {
+						new Notice("Chorographia: " + e.message);
+					}
+					btn.setDisabled(false);
+					btn.setButtonText("Run");
+				})
+			);
+
 		if (this.plugin.settings.enableLLMZoneNaming) {
 			new Setting(containerEl)
 				.setName("Re-run zone naming")

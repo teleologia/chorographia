@@ -7731,6 +7731,20 @@ var ChorographiaSettingTab = class extends import_obsidian.PluginSettingTab {
         btn.setButtonText("Run");
       })
     );
+    new import_obsidian.Setting(containerEl).setName("Recompute layout").setDesc("Run UMAP on cached embeddings to produce a new 2D layout.").addButton(
+      (btn) => btn.setButtonText("Run").onClick(async () => {
+        btn.setDisabled(true);
+        btn.setButtonText("Running...");
+        try {
+          await this.plugin.runLayoutCompute();
+          new import_obsidian.Notice("Chorographia: Layout complete.");
+        } catch (e) {
+          new import_obsidian.Notice("Chorographia: " + e.message);
+        }
+        btn.setDisabled(false);
+        btn.setButtonText("Run");
+      })
+    );
     if (this.plugin.settings.enableLLMZoneNaming) {
       new import_obsidian.Setting(containerEl).setName("Re-run zone naming").setDesc("Regenerate LLM names for all zones and sub-zones.").addButton(
         (btn) => btn.setButtonText("Run").onClick(async () => {
