@@ -25,9 +25,13 @@ The result is a map you can pan, zoom, and click through.
 - *Star map* — Overlapping smooth blobs with soft zone boundaries
 - *World map* — Non-overlapping country shapes with fractal coastlines, continent grouping, and province sub-divisions
 
+![Star map — global view with zones and link overlay](screenshots/global_view.png)
+
 **Semantic zones** — Color-coded regions drawn behind the points using k-means clustering. Each zone gets an auto-label, and optionally an LLM-generated name. Sub-zones (provinces) fade in smoothly as you zoom.
 
 ![Zoomed in — province borders, note titles, link overlay, and minimap with zone contours](screenshots/provinces_minimap.png)
+
+![Star map — zoomed in with sub-zones and minimap](screenshots/local_view.png)
 
 **Pullout menu** — A gear icon in the top-right corner opens a quick-access menu with toggles for:
 - **Color mode** — Semantic, folder, type, or category
@@ -38,6 +42,8 @@ The result is a map you can pan, zoom, and click through.
 - **Minimap** — Off, or choose a corner (TL/TR/BL/BR)
 
 **Navigate by clicking** — Clicking a point opens the note and smoothly re-centers the view. Walk through your vault spatially, discovering notes by proximity rather than by name.
+
+![Using the map as navigation alongside note editing](screenshots/use_as_navigation.png)
 
 **Link overlay** — Wikilink edges rendered between notes. Hover or select a note to highlight its connections.
 
@@ -72,6 +78,12 @@ The result is a map you can pan, zoom, and click through.
 5. Open the map with the ribbon icon or the "Open Chorographia Map" command
 
 ## Settings
+
+![Embedding settings](screenshots/settings_1.png)
+
+![Zone settings and map display](screenshots/settings_2.png)
+
+![Actions](screenshots/settings_3.png)
 
 ### Embedding
 - **Provider** — Ollama (local), OpenAI, or OpenRouter
