@@ -60,7 +60,7 @@ export const DEFAULT_SETTINGS: ChorographiaSettings = {
 	worldmapSeaLevel: 0.20,
 	worldmapUnity: 0.07,
 	worldmapRuggedness: 0.4,
-	mapLocked: true,
+	mapLocked: false,
 	showSubZones: true,
 	showNoteTitles: true,
 };

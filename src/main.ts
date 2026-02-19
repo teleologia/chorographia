@@ -295,6 +295,11 @@ export default class ChorographiaPlugin extends Plugin {
 			Object.values(this.cache.notes).some((n) => n.embedding && n.x == null);
 		if (!hasLayout || hasNewWithoutCoords) {
 			await this.runLayoutCompute();
+			// Auto-enable lock after first successful layout
+			if (!hasLayout && !this.settings.mapLocked) {
+				this.settings.mapLocked = true;
+				await this.saveSettings();
+			}
 		}
 	}
 

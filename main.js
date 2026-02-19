@@ -7473,7 +7473,7 @@ var DEFAULT_SETTINGS = {
   worldmapSeaLevel: 0.2,
   worldmapUnity: 0.07,
   worldmapRuggedness: 0.4,
-  mapLocked: true,
+  mapLocked: false,
   showSubZones: true,
   showNoteTitles: true
 };
@@ -10717,7 +10717,9 @@ var ChorographiaView = class extends import_obsidian6.ItemView {
       ctx.fillStyle = th.textMuted;
       ctx.font = "15px var(--font-interface)";
       ctx.textAlign = "center";
-      ctx.fillText("No points. Run re-embed + recompute layout in settings.", W / 2, H / 2);
+      const hasEmbeddings = Object.values(this.plugin.cache.notes).some((n) => n.embedding);
+      const msg = hasEmbeddings ? "Embeddings found but no layout. Run Recompute Layout in settings." : "No points. Run Re-embed in settings.";
+      ctx.fillText(msg, W / 2, H / 2);
       return;
     }
     const showLinks = this.plugin.settings.showLinks;
@@ -11709,6 +11711,10 @@ var ChorographiaPlugin = class extends import_obsidian7.Plugin {
     const hasNewWithoutCoords = this.settings.mapLocked && Object.values(this.cache.notes).some((n) => n.embedding && n.x == null);
     if (!hasLayout || hasNewWithoutCoords) {
       await this.runLayoutCompute();
+      if (!hasLayout && !this.settings.mapLocked) {
+        this.settings.mapLocked = true;
+        await this.saveSettings();
+      }
     }
   }
   async runZoneNaming() {

@@ -808,7 +808,11 @@ export class ChorographiaView extends ItemView {
 			ctx.fillStyle = th.textMuted;
 			ctx.font = "15px var(--font-interface)";
 			ctx.textAlign = "center";
-			ctx.fillText("No points. Run re-embed + recompute layout in settings.", W / 2, H / 2);
+			const hasEmbeddings = Object.values(this.plugin.cache.notes).some((n) => n.embedding);
+			const msg = hasEmbeddings
+				? "Embeddings found but no layout. Run Recompute Layout in settings."
+				: "No points. Run Re-embed in settings.";
+			ctx.fillText(msg, W / 2, H / 2);
 			return;
 		}
 
