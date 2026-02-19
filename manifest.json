@@ -1,7 +1,7 @@
 {
 	"id": "chorographia",
 	"name": "Chorographia",
-	"version": "0.2.0-beta.2",
+	"version": "0.3.0-beta.1",
 	"minAppVersion": "1.0.0",
 	"description": "Semantic map of your vault — interactive 2D embedding visualization with UMAP projection.",
 	"author": "Chorographia",

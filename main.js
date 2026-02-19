@@ -7444,7 +7444,7 @@ __export(main_exports, {
   default: () => ChorographiaPlugin
 });
 module.exports = __toCommonJS(main_exports);
-var import_obsidian8 = require("obsidian");
+var import_obsidian7 = require("obsidian");
 
 // src/settings.ts
 var import_obsidian = require("obsidian");
@@ -7468,7 +7468,14 @@ var DEFAULT_SETTINGS = {
   minimapCorner: "bottom-left",
   showZones: false,
   zoneGranularity: 6,
-  enableLLMZoneNaming: false
+  enableLLMZoneNaming: false,
+  zoneStyle: "starmap",
+  worldmapSeaLevel: 0.2,
+  worldmapUnity: 0.07,
+  worldmapRuggedness: 0.4,
+  mapLocked: true,
+  showSubZones: true,
+  showNoteTitles: true
 };
 var ChorographiaSettingTab = class extends import_obsidian.PluginSettingTab {
   constructor(app, plugin) {
@@ -7526,7 +7533,7 @@ var ChorographiaSettingTab = class extends import_obsidian.PluginSettingTab {
       cls: "setting-item-description"
     });
     new import_obsidian.Setting(containerEl).setName("Provider").addDropdown(
-      (dd) => dd.addOption("ollama", "Ollama (local)").addOption("openai", "OpenAI").addOption("openrouter", "OpenRouter").addOption("smart-connections", "Smart Connections").setValue(this.plugin.settings.embeddingProvider).onChange(async (value) => {
+      (dd) => dd.addOption("ollama", "Ollama (local)").addOption("openai", "OpenAI").addOption("openrouter", "OpenRouter").setValue(this.plugin.settings.embeddingProvider).onChange(async (value) => {
         this.plugin.settings.embeddingProvider = value;
         await this.plugin.saveSettings();
         this.display();
@@ -7553,8 +7560,6 @@ var ChorographiaSettingTab = class extends import_obsidian.PluginSettingTab {
           await this.plugin.saveSettings();
         })
       );
-    } else if (this.plugin.settings.embeddingProvider === "smart-connections") {
-      new import_obsidian.Setting(containerEl).setName("Smart Connections").setDesc("Imports embeddings from the Smart Connections plugin. Make sure it is installed and has generated embeddings.");
     }
     new import_obsidian.Setting(containerEl).setName("Include globs").setDesc("Comma-separated glob patterns for notes to index.").addText(
       (text) => text.setPlaceholder("**/*.md").setValue(this.plugin.settings.includeGlobs).onChange(async (value) => {
@@ -7605,6 +7610,40 @@ var ChorographiaSettingTab = class extends import_obsidian.PluginSettingTab {
           this.plugin.refreshMapViews();
         });
       });
+      new import_obsidian.Setting(containerEl).setName("Zone style").setDesc("Star map: overlapping smooth blobs. World map: non-overlapping country shapes with fractal borders.").addDropdown((dd) => {
+        dd.addOption("starmap", "Star map");
+        dd.addOption("worldmap", "World map");
+        dd.setValue(this.plugin.settings.zoneStyle);
+        dd.onChange(async (value) => {
+          this.plugin.settings.zoneStyle = value;
+          await this.plugin.saveSettings();
+          this.plugin.refreshMapViews();
+          this.display();
+        });
+      });
+      if (this.plugin.settings.zoneStyle === "worldmap") {
+        new import_obsidian.Setting(containerEl).setName("Land density").setDesc("% of peak height that becomes land. High = sparse thin countries, low = thick flooded land.").addSlider(
+          (sl) => sl.setLimits(0.05, 0.5, 0.01).setValue(this.plugin.settings.worldmapSeaLevel).setDynamicTooltip().onChange(async (value) => {
+            this.plugin.settings.worldmapSeaLevel = value;
+            await this.plugin.saveSettings();
+            this.plugin.refreshMapViews();
+          })
+        );
+        new import_obsidian.Setting(containerEl).setName("Continental unity").setDesc("How far clusters reach to merge. Low = archipelago, high = pangea.").addSlider(
+          (sl) => sl.setLimits(0.03, 0.12, 5e-3).setValue(this.plugin.settings.worldmapUnity).setDynamicTooltip().onChange(async (value) => {
+            this.plugin.settings.worldmapUnity = value;
+            await this.plugin.saveSettings();
+            this.plugin.refreshMapViews();
+          })
+        );
+        new import_obsidian.Setting(containerEl).setName("Coast ruggedness").setDesc("Higher = jagged fjords, lower = smooth beaches.").addSlider(
+          (sl) => sl.setLimits(0.1, 1, 0.05).setValue(this.plugin.settings.worldmapRuggedness).setDynamicTooltip().onChange(async (value) => {
+            this.plugin.settings.worldmapRuggedness = value;
+            await this.plugin.saveSettings();
+            this.plugin.refreshMapViews();
+          })
+        );
+      }
       new import_obsidian.Setting(containerEl).setName("LLM zone naming").setDesc("Use an LLM to generate evocative names for each zone.").addToggle(
         (toggle) => toggle.setValue(this.plugin.settings.enableLLMZoneNaming).onChange(async (value) => {
           this.plugin.settings.enableLLMZoneNaming = value;
@@ -7636,21 +7675,14 @@ var ChorographiaSettingTab = class extends import_obsidian.PluginSettingTab {
             })
           );
         }
-        new import_obsidian.Setting(containerEl).setName("Re-run zone naming").setDesc("Regenerate LLM names for all zones and sub-zones.").addButton(
-          (btn) => btn.setButtonText("Run").onClick(async () => {
-            btn.setDisabled(true);
-            btn.setButtonText("Running...");
-            try {
-              await this.plugin.runZoneNaming();
-              new import_obsidian.Notice("Chorographia: Zone naming complete.");
-            } catch (e) {
-              new import_obsidian.Notice("Chorographia: " + e.message);
-            }
-            btn.setDisabled(false);
-            btn.setButtonText("Run");
-          })
-        );
       }
+      new import_obsidian.Setting(containerEl).setName("Lock map").setDesc("Preserve note positions, cluster assignments, and zone names across re-embeds.").addToggle(
+        (toggle) => toggle.setValue(this.plugin.settings.mapLocked).onChange(async (value) => {
+          this.plugin.settings.mapLocked = value;
+          await this.plugin.saveSettings();
+          this.plugin.refreshMapViews();
+        })
+      );
     }
     containerEl.createEl("h3", { text: "Map Display" });
     containerEl.createEl("p", {
@@ -7678,7 +7710,7 @@ var ChorographiaSettingTab = class extends import_obsidian.PluginSettingTab {
       })
     );
     new import_obsidian.Setting(containerEl).setName("Minimap corner").setDesc("Corner for the global minimap shown in local view.").addDropdown(
-      (dd) => dd.addOption("top-left", "Top-left").addOption("top-right", "Top-right").addOption("bottom-left", "Bottom-left").addOption("bottom-right", "Bottom-right").setValue(this.plugin.settings.minimapCorner).onChange(async (value) => {
+      (dd) => dd.addOption("off", "Off").addOption("top-left", "Top-left").addOption("top-right", "Top-right").addOption("bottom-left", "Bottom-left").addOption("bottom-right", "Bottom-right").setValue(this.plugin.settings.minimapCorner).onChange(async (value) => {
         this.plugin.settings.minimapCorner = value;
         await this.plugin.saveSettings();
         this.plugin.refreshMapViews();
@@ -7699,27 +7731,40 @@ var ChorographiaSettingTab = class extends import_obsidian.PluginSettingTab {
         btn.setButtonText("Run");
       })
     );
-    new import_obsidian.Setting(containerEl).setName("Recompute layout").setDesc("Run UMAP on cached embeddings to produce a new 2D layout.").addButton(
-      (btn) => btn.setButtonText("Run").onClick(async () => {
-        btn.setDisabled(true);
-        btn.setButtonText("Running...");
-        try {
-          await this.plugin.runLayoutCompute();
-          new import_obsidian.Notice("Chorographia: Layout computed.");
-        } catch (e) {
-          new import_obsidian.Notice("Chorographia: " + e.message);
-        }
-        btn.setDisabled(false);
-        btn.setButtonText("Run");
-      })
-    );
+    if (this.plugin.settings.enableLLMZoneNaming) {
+      new import_obsidian.Setting(containerEl).setName("Re-run zone naming").setDesc("Regenerate LLM names for all zones and sub-zones.").addButton(
+        (btn) => btn.setButtonText("Run").onClick(async () => {
+          if (this.plugin.settings.mapLocked) {
+            if (!confirm("Map is locked. This will regenerate all zone names. Continue?"))
+              return;
+          }
+          btn.setDisabled(true);
+          btn.setButtonText("Running...");
+          try {
+            await this.plugin.runZoneNaming();
+            new import_obsidian.Notice("Chorographia: Zone naming complete.");
+          } catch (e) {
+            new import_obsidian.Notice("Chorographia: " + e.message);
+          }
+          btn.setDisabled(false);
+          btn.setButtonText("Run");
+        })
+      );
+    }
     new import_obsidian.Setting(containerEl).setName("Clear cache").setDesc("Delete all cached embeddings and layout data.").addButton(
       (btn) => btn.setButtonText("Clear").setWarning().onClick(async () => {
-        if (confirm("Delete all Chorographia cached data?")) {
-          this.plugin.cache = { notes: {} };
-          await this.plugin.saveCache();
-          new import_obsidian.Notice("Chorographia: Cache cleared.");
+        const locked = this.plugin.settings.mapLocked;
+        const msg = locked ? "Map is locked. Clearing cache will erase all positions, zone data, and locked names. Continue?" : "This will erase all cached embeddings, positions, and zone data. You will need to re-embed to rebuild the map. Continue?";
+        if (!confirm(msg))
+          return;
+        this.plugin.cache = { notes: {} };
+        if (locked) {
+          this.plugin.settings.mapLocked = false;
+          await this.plugin.saveSettings();
         }
+        await this.plugin.saveCache();
+        new import_obsidian.Notice("Chorographia: Cache cleared.");
+        this.display();
       })
     );
   }
@@ -8136,96 +8181,16 @@ function sleep2(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-// src/smartconnections.ts
-var import_obsidian5 = require("obsidian");
-async function importSmartConnectionsEmbeddings(app, paths) {
-  const results = [];
-  const pathSet = new Set(paths);
-  const found = /* @__PURE__ */ new Set();
-  const smartEnv = globalThis.smart_env;
-  if (smartEnv?.smart_sources) {
-    const sources = smartEnv.smart_sources;
-    const items = sources.items || {};
-    for (const [key, item] of Object.entries(items)) {
-      const source = item;
-      const sourcePath = source.data?.path || key;
-      if (!pathSet.has(sourcePath) || found.has(sourcePath))
-        continue;
-      const vec = source.vec;
-      if (!vec || !Array.isArray(vec) || vec.length === 0)
-        continue;
-      found.add(sourcePath);
-      results.push({
-        path: sourcePath,
-        embedding: encodeFloat32(new Float32Array(vec))
-      });
-    }
-    if (results.length > 0) {
-      new import_obsidian5.Notice(`Chorographia: Imported ${results.length} embeddings from Smart Connections.`);
-      return results;
-    }
-  }
-  const adapter = app.vault.adapter;
-  const ajsonDir = ".smart-env/multi";
-  if (await adapter.exists(ajsonDir)) {
-    const listing = await adapter.list(ajsonDir);
-    const ajsonFiles = listing.files.filter((f) => f.endsWith(".ajson"));
-    for (const filePath of ajsonFiles) {
-      try {
-        const content = await adapter.read(filePath);
-        for (const line of content.split("\n")) {
-          const trimmed = line.trim();
-          if (!trimmed || trimmed === "{" || trimmed === "}")
-            continue;
-          const colonIdx = trimmed.indexOf(":");
-          if (colonIdx < 0)
-            continue;
-          let keyPart = trimmed.slice(0, colonIdx + trimmed.slice(colonIdx + 1).indexOf(":") + colonIdx + 1);
-          const jsonStart = trimmed.indexOf(": {");
-          if (jsonStart < 0)
-            continue;
-          let rawKey = trimmed.slice(0, jsonStart).trim();
-          if (rawKey.startsWith('"'))
-            rawKey = rawKey.slice(1);
-          if (rawKey.endsWith('"'))
-            rawKey = rawKey.slice(0, -1);
-          const prefixEnd = rawKey.indexOf(":");
-          const notePath = prefixEnd >= 0 ? rawKey.slice(prefixEnd + 1) : rawKey;
-          if (notePath.includes("#"))
-            continue;
-          if (!pathSet.has(notePath) || found.has(notePath))
-            continue;
-          let jsonStr = trimmed.slice(jsonStart + 2);
-          if (jsonStr.endsWith(","))
-            jsonStr = jsonStr.slice(0, -1);
-          try {
-            const data = JSON.parse(jsonStr);
-            const vec = data.vec;
-            if (!vec || !Array.isArray(vec) || vec.length === 0)
-              continue;
-            found.add(notePath);
-            results.push({
-              path: notePath,
-              embedding: encodeFloat32(new Float32Array(vec))
-            });
-          } catch {
-          }
-        }
-      } catch {
-      }
-    }
-    if (results.length > 0) {
-      new import_obsidian5.Notice(`Chorographia: Imported ${results.length} embeddings from Smart Connections files.`);
-      return results;
-    }
-  }
-  throw new Error(
-    "Smart Connections embeddings not found. Make sure Smart Connections is installed, enabled, and has generated embeddings."
-  );
-}
-
 // src/layout.ts
 var import_umap_js = __toESM(require_dist());
+function euclideanDistF32(a, b) {
+  let sum = 0;
+  for (let i = 0; i < a.length; i++) {
+    const d = a[i] - b[i];
+    sum += d * d;
+  }
+  return Math.sqrt(sum);
+}
 function mulberry32(seed) {
   return () => {
     seed |= 0;
@@ -8275,6 +8240,40 @@ function computeLayout(notes, seed = 42) {
     x: (coords[i][0] - minX) / rangeX * 2 - 1,
     y: (coords[i][1] - minY) / rangeY * 2 - 1
   }));
+}
+function interpolateNewPoints(notes, newPaths, kNeighbors = 5) {
+  const anchors = [];
+  for (const [path, n] of Object.entries(notes)) {
+    if (n.embedding && n.x != null && n.y != null) {
+      anchors.push({ path, embedding: decodeFloat32(n.embedding), x: n.x, y: n.y });
+    }
+  }
+  if (anchors.length === 0)
+    return [];
+  const k = Math.min(kNeighbors, anchors.length);
+  const results = [];
+  for (const path of newPaths) {
+    const note = notes[path];
+    if (!note?.embedding)
+      continue;
+    const vec = decodeFloat32(note.embedding);
+    const dists = [];
+    for (let i = 0; i < anchors.length; i++) {
+      dists.push({ idx: i, dist: euclideanDistF32(vec, anchors[i].embedding) });
+    }
+    dists.sort((a, b) => a.dist - b.dist);
+    const nearest = dists.slice(0, k);
+    let totalW = 0;
+    let wx = 0, wy = 0;
+    for (const { idx, dist } of nearest) {
+      const w = dist < 1e-9 ? 1e9 : 1 / dist;
+      totalW += w;
+      wx += anchors[idx].x * w;
+      wy += anchors[idx].y * w;
+    }
+    results.push({ path, x: wx / totalW, y: wy / totalW });
+  }
+  return results;
 }
 
 // src/kmeans.ts
@@ -8398,23 +8397,450 @@ function computeSemanticAssignments(vectors, centroids) {
 }
 
 // src/view.ts
-var import_obsidian7 = require("obsidian");
+var import_obsidian6 = require("obsidian");
 
-// src/zones.ts
-var SEM_PALETTE = [
-  "#00D6FF",
-  "#B9FF00",
-  "#FF7A00",
-  "#A855F7",
-  "#00FFB3",
-  "#FF3DB8",
-  "#00FFA3",
-  "#FFD400",
-  "#00F5D4",
-  "#FF9A3D",
-  "#7CFFCB",
-  "#B8C0FF"
-];
+// src/voronoi.ts
+function mulberry323(seed) {
+  return () => {
+    seed |= 0;
+    seed = seed + 1831565813 | 0;
+    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+function clipConvexPolygons(subject, clip) {
+  if (subject.length < 3 || clip.length < 3)
+    return [];
+  let output = subject;
+  for (let i = 0; i < clip.length; i++) {
+    if (output.length === 0)
+      return [];
+    const edgeA = clip[i];
+    const edgeB = clip[(i + 1) % clip.length];
+    const input = output;
+    output = [];
+    for (let j = 0; j < input.length; j++) {
+      const cur = input[j];
+      const prev = input[(j + input.length - 1) % input.length];
+      const curInside = isLeft(edgeA, edgeB, cur);
+      const prevInside = isLeft(edgeA, edgeB, prev);
+      if (curInside) {
+        if (!prevInside) {
+          const ix = lineIntersect(prev, cur, edgeA, edgeB);
+          if (ix)
+            output.push(ix);
+        }
+        output.push(cur);
+      } else if (prevInside) {
+        const ix = lineIntersect(prev, cur, edgeA, edgeB);
+        if (ix)
+          output.push(ix);
+      }
+    }
+  }
+  return output;
+}
+function isLeft(a, b, p) {
+  return (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x) >= 0;
+}
+function lineIntersect(p1, p2, p3, p4) {
+  const d1x = p2.x - p1.x, d1y = p2.y - p1.y;
+  const d2x = p4.x - p3.x, d2y = p4.y - p3.y;
+  const denom = d1x * d2y - d1y * d2x;
+  if (Math.abs(denom) < 1e-12)
+    return null;
+  const t = ((p3.x - p1.x) * d2y - (p3.y - p1.y) * d2x) / denom;
+  return { x: p1.x + d1x * t, y: p1.y + d1y * t };
+}
+function computeVoronoiCells(centroids, bounds) {
+  const { minX, minY, maxX, maxY } = bounds;
+  const boundRect = [
+    { x: minX, y: minY },
+    { x: maxX, y: minY },
+    { x: maxX, y: maxY },
+    { x: minX, y: maxY }
+  ];
+  const cells = [];
+  for (let i = 0; i < centroids.length; i++) {
+    let cell = [...boundRect];
+    for (let j = 0; j < centroids.length; j++) {
+      if (i === j)
+        continue;
+      if (cell.length < 3)
+        break;
+      const ci = centroids[i], cj = centroids[j];
+      const mx = (ci.x + cj.x) / 2;
+      const my = (ci.y + cj.y) / 2;
+      const nx = ci.x - cj.x;
+      const ny = ci.y - cj.y;
+      const perpX = -ny, perpY = nx;
+      const len = Math.sqrt(perpX * perpX + perpY * perpY) || 1;
+      const bigR = (maxX - minX + maxY - minY) * 2;
+      const px = perpX / len, py = perpY / len;
+      const nnx = nx / len, nny = ny / len;
+      const halfPlane = [
+        { x: mx - px * bigR, y: my - py * bigR },
+        { x: mx - px * bigR + nnx * bigR, y: my - py * bigR + nny * bigR },
+        { x: mx + px * bigR + nnx * bigR, y: my + py * bigR + nny * bigR },
+        { x: mx + px * bigR, y: my + py * bigR }
+      ];
+      cell = clipConvexPolygons(cell, halfPlane);
+    }
+    cells.push(cell);
+  }
+  return cells;
+}
+function edgeSeed(a, b) {
+  let p0 = a, p1 = b;
+  if (a.x > b.x || a.x === b.x && a.y > b.y) {
+    p0 = b;
+    p1 = a;
+  }
+  const h = Math.round(p0.x * 1e5) * 73856093 ^ Math.round(p0.y * 1e5) * 19349663 ^ Math.round(p1.x * 1e5) * 83492791 ^ Math.round(p1.y * 1e5) * 45989861;
+  return Math.abs(h) >>> 0;
+}
+function fractalDisplace(polygon, iterations, amplitude, _seed) {
+  if (polygon.length < 3 || iterations <= 0)
+    return polygon;
+  let current = polygon;
+  for (let iter = 0; iter < iterations; iter++) {
+    const next = [];
+    const amp = amplitude / Math.pow(2, iter);
+    for (let i = 0; i < current.length; i++) {
+      const a = current[i];
+      const b = current[(i + 1) % current.length];
+      next.push(a);
+      const mx = (a.x + b.x) / 2;
+      const my = (a.y + b.y) / 2;
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const len = Math.sqrt(dx * dx + dy * dy);
+      if (len < 1e-10)
+        continue;
+      let ca = a, cb = b;
+      if (a.x > b.x || a.x === b.x && a.y > b.y) {
+        ca = b;
+        cb = a;
+      }
+      const cdx = cb.x - ca.x, cdy = cb.y - ca.y;
+      const px = -cdy / len, py = cdx / len;
+      const rng = mulberry323(edgeSeed(a, b) + iter * 7919);
+      const disp = (rng() - 0.5) * 2 * amp;
+      next.push({ x: mx + px * disp, y: my + py * disp });
+    }
+    current = next;
+  }
+  return current;
+}
+
+// src/delaunay.ts
+function circumcircle(px, py, i0, i1, i2) {
+  const ax = px[i0], ay = py[i0];
+  const bx = px[i1], by = py[i1];
+  const cx = px[i2], cy = py[i2];
+  const d = 2 * (ax * (by - cy) + bx * (cy - ay) + cx * (ay - by));
+  if (Math.abs(d) < 1e-12) {
+    return { cx: (ax + bx + cx) / 3, cy: (ay + by + cy) / 3, rSq: Infinity };
+  }
+  const aSq = ax * ax + ay * ay;
+  const bSq = bx * bx + by * by;
+  const cSq = cx * cx + cy * cy;
+  const ux = (aSq * (by - cy) + bSq * (cy - ay) + cSq * (ay - by)) / d;
+  const uy = (aSq * (cx - bx) + bSq * (ax - cx) + cSq * (bx - ax)) / d;
+  const dx = ax - ux, dy = ay - uy;
+  return { cx: ux, cy: uy, rSq: dx * dx + dy * dy };
+}
+function voronoiFromDelaunay(coords, count, bounds) {
+  const n = count;
+  if (n < 3) {
+    const cells = [];
+    const centroids = [];
+    const adj = [];
+    const pad = Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY) * 0.01 || 0.01;
+    for (let i = 0; i < n; i++) {
+      const x = coords[i * 2], y = coords[i * 2 + 1];
+      cells.push([
+        { x: x - pad, y: y - pad },
+        { x: x + pad, y: y - pad },
+        { x: x + pad, y: y + pad },
+        { x: x - pad, y: y + pad }
+      ]);
+      centroids.push({ x, y });
+      adj.push([]);
+    }
+    return { cellCount: n, cellPolygons: cells, cellCentroids: centroids, adjacency: adj };
+  }
+  const px = new Array(n + 3);
+  const py = new Array(n + 3);
+  for (let i = 0; i < n; i++) {
+    px[i] = coords[i * 2];
+    py[i] = coords[i * 2 + 1];
+  }
+  const dx = bounds.maxX - bounds.minX;
+  const dy = bounds.maxY - bounds.minY;
+  const dmax = Math.max(dx, dy, 1e-6);
+  const midX = (bounds.minX + bounds.maxX) / 2;
+  const midY = (bounds.minY + bounds.maxY) / 2;
+  const margin = dmax * 20;
+  px[n] = midX - margin;
+  py[n] = midY - margin;
+  px[n + 1] = midX + margin;
+  py[n + 1] = midY - margin;
+  px[n + 2] = midX;
+  py[n + 2] = midY + margin;
+  const triangles = [];
+  {
+    const cc = circumcircle(px, py, n, n + 1, n + 2);
+    triangles.push({ i0: n, i1: n + 1, i2: n + 2, dead: false, cx: cc.cx, cy: cc.cy });
+  }
+  for (let i = 0; i < n; i++) {
+    const x = px[i], y = py[i];
+    const badTriangles = [];
+    for (let t = 0; t < triangles.length; t++) {
+      const tri = triangles[t];
+      if (tri.dead)
+        continue;
+      const cc = circumcircle(px, py, tri.i0, tri.i1, tri.i2);
+      const ddx = x - cc.cx, ddy = y - cc.cy;
+      if (ddx * ddx + ddy * ddy <= cc.rSq + 1e-10) {
+        badTriangles.push(t);
+      }
+    }
+    const boundary = [];
+    for (const bt of badTriangles) {
+      const tri = triangles[bt];
+      const edges = [
+        { i0: tri.i0, i1: tri.i1 },
+        { i0: tri.i1, i1: tri.i2 },
+        { i0: tri.i2, i1: tri.i0 }
+      ];
+      for (const edge of edges) {
+        let shared = false;
+        for (const bt2 of badTriangles) {
+          if (bt2 === bt)
+            continue;
+          const tri2 = triangles[bt2];
+          const e2 = [
+            [tri2.i0, tri2.i1],
+            [tri2.i1, tri2.i2],
+            [tri2.i2, tri2.i0]
+          ];
+          for (const [a, b] of e2) {
+            if (a === edge.i1 && b === edge.i0 || a === edge.i0 && b === edge.i1) {
+              shared = true;
+              break;
+            }
+          }
+          if (shared)
+            break;
+        }
+        if (!shared)
+          boundary.push(edge);
+      }
+    }
+    for (const bt of badTriangles) {
+      triangles[bt].dead = true;
+    }
+    for (const edge of boundary) {
+      const cc = circumcircle(px, py, edge.i0, edge.i1, i);
+      triangles.push({ i0: edge.i0, i1: edge.i1, i2: i, dead: false, cx: cc.cx, cy: cc.cy });
+    }
+  }
+  const pointTriangles = new Array(n);
+  for (let i = 0; i < n; i++)
+    pointTriangles[i] = [];
+  for (let t = 0; t < triangles.length; t++) {
+    const tri = triangles[t];
+    if (tri.dead)
+      continue;
+    if (tri.i0 < n)
+      pointTriangles[tri.i0].push(t);
+    if (tri.i1 < n)
+      pointTriangles[tri.i1].push(t);
+    if (tri.i2 < n)
+      pointTriangles[tri.i2].push(t);
+  }
+  const cellPolygons = new Array(n);
+  const cellCentroids = new Array(n);
+  const adjacencySet = new Array(n);
+  for (let i = 0; i < n; i++)
+    adjacencySet[i] = /* @__PURE__ */ new Set();
+  for (let i = 0; i < n; i++) {
+    const tris = pointTriangles[i];
+    if (tris.length === 0) {
+      cellPolygons[i] = [];
+      cellCentroids[i] = { x: px[i], y: py[i] };
+      continue;
+    }
+    const ordered = orderTrianglesAroundPoint(i, tris, triangles);
+    const poly = [];
+    for (const t of ordered) {
+      const tri = triangles[t];
+      let cx2 = tri.cx, cy2 = tri.cy;
+      cx2 = Math.max(bounds.minX, Math.min(bounds.maxX, cx2));
+      cy2 = Math.max(bounds.minY, Math.min(bounds.maxY, cy2));
+      poly.push({ x: cx2, y: cy2 });
+    }
+    const deduped = [];
+    for (let j = 0; j < poly.length; j++) {
+      const prev = j > 0 ? deduped[deduped.length - 1] : poly[poly.length - 1];
+      const p = poly[j];
+      if (deduped.length === 0 || Math.abs(p.x - prev.x) > 1e-10 || Math.abs(p.y - prev.y) > 1e-10) {
+        deduped.push(p);
+      }
+    }
+    cellPolygons[i] = deduped;
+    let cx = 0, cy = 0;
+    for (const p of deduped) {
+      cx += p.x;
+      cy += p.y;
+    }
+    if (deduped.length > 0) {
+      cx /= deduped.length;
+      cy /= deduped.length;
+    } else {
+      cx = px[i];
+      cy = py[i];
+    }
+    cellCentroids[i] = { x: cx, y: cy };
+    for (const t of ordered) {
+      const tri = triangles[t];
+      const verts = [tri.i0, tri.i1, tri.i2];
+      for (const v of verts) {
+        if (v !== i && v < n) {
+          adjacencySet[i].add(v);
+        }
+      }
+    }
+  }
+  const adjacency = new Array(n);
+  for (let i = 0; i < n; i++)
+    adjacency[i] = [...adjacencySet[i]];
+  return { cellCount: n, cellPolygons, cellCentroids, adjacency };
+}
+function orderTrianglesAroundPoint(pointIdx, triIndices, triangles) {
+  if (triIndices.length <= 1)
+    return triIndices;
+  const px = 0, py = 0;
+  const angles = triIndices.map((t) => {
+    const tri = triangles[t];
+    return { idx: t, angle: 0 };
+  });
+  let refX = 0, refY = 0;
+  {
+    const t0 = triangles[triIndices[0]];
+    const verts = [t0.i0, t0.i1, t0.i2];
+  }
+  const tri0 = triangles[triIndices[0]];
+  let ptX = 0, ptY = 0;
+  let meanX = 0, meanY = 0;
+  for (const t of triIndices) {
+    meanX += triangles[t].cx;
+    meanY += triangles[t].cy;
+  }
+  meanX /= triIndices.length;
+  meanY /= triIndices.length;
+  for (let i = 0; i < angles.length; i++) {
+    const tri = triangles[angles[i].idx];
+    angles[i].angle = Math.atan2(tri.cy - meanY, tri.cx - meanX);
+  }
+  angles.sort((a, b) => a.angle - b.angle);
+  return angles.map((a) => a.idx);
+}
+
+// src/noise.ts
+function mulberry324(seed) {
+  return () => {
+    seed |= 0;
+    seed = seed + 1831565813 | 0;
+    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+function buildPermTable(seed) {
+  const size = 512;
+  const perm = new Uint16Array(size);
+  const rng = mulberry324(seed);
+  for (let i = 0; i < 256; i++)
+    perm[i] = i;
+  for (let i = 255; i > 0; i--) {
+    const j = rng() * (i + 1) | 0;
+    const tmp = perm[i];
+    perm[i] = perm[j];
+    perm[j] = tmp;
+  }
+  for (let i = 0; i < 256; i++)
+    perm[i + 256] = perm[i];
+  return perm;
+}
+function buildGradTable(seed) {
+  const rng = mulberry324(seed ^ 305419896);
+  const grads = new Float64Array(256);
+  for (let i = 0; i < 256; i++)
+    grads[i] = rng() * 2 - 1;
+  return grads;
+}
+function smootherstep(t) {
+  return t * t * t * (t * (t * 6 - 15) + 10);
+}
+function valueNoise2D(x, y, perm, grads) {
+  const xi = Math.floor(x);
+  const yi = Math.floor(y);
+  const xf = x - xi;
+  const yf = y - yi;
+  const u = smootherstep(xf);
+  const v = smootherstep(yf);
+  const ix = xi & 255;
+  const iy = yi & 255;
+  const v00 = grads[perm[perm[ix] + iy] & 255];
+  const v10 = grads[perm[perm[ix + 1 & 255] + iy] & 255];
+  const v01 = grads[perm[perm[ix] + (iy + 1 & 255)] & 255];
+  const v11 = grads[perm[perm[ix + 1 & 255] + (iy + 1 & 255)] & 255];
+  const a = v00 + u * (v10 - v00);
+  const b = v01 + u * (v11 - v01);
+  return a + v * (b - a);
+}
+function fbm2D(x, y, octaves, lacunarity, persistence, perm, grads) {
+  let value = 0;
+  let amp = 1;
+  let freq = 1;
+  let maxAmp = 0;
+  for (let i = 0; i < octaves; i++) {
+    value += amp * valueNoise2D(x * freq, y * freq, perm, grads);
+    maxAmp += amp;
+    amp *= persistence;
+    freq *= lacunarity;
+  }
+  return value / maxAmp;
+}
+function domainWarp(x, y, amplitude, frequency, perm1, grads1, perm2, grads2) {
+  const wx = fbm2D(x * frequency, y * frequency, 4, 2, 0.5, perm1, grads1);
+  const wy = fbm2D(x * frequency + 7.31, y * frequency + 3.77, 4, 2, 0.5, perm2, grads2);
+  return {
+    x: x + amplitude * wx,
+    y: y + amplitude * wy
+  };
+}
+function createNoiseContext(seed) {
+  return {
+    perm1: buildPermTable(seed),
+    grads1: buildGradTable(seed),
+    perm2: buildPermTable(seed ^ 3735928559),
+    grads2: buildGradTable(seed ^ 3405691582)
+  };
+}
+
+// src/worldmap.ts
+function mulberry325(seed) {
+  return () => {
+    seed |= 0;
+    seed = seed + 1831565813 | 0;
+    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
 function cross(o, a, b) {
   return (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
 }
@@ -8433,6 +8859,828 @@ function convexHull(points) {
   for (let i = n - 1; i >= 0; i--) {
     const p = sorted[i];
     while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0)
+      upper.pop();
+    upper.push(p);
+  }
+  lower.pop();
+  upper.pop();
+  return lower.concat(upper);
+}
+var SEM_PALETTE = [
+  "#00D6FF",
+  "#B9FF00",
+  "#FF7A00",
+  "#A855F7",
+  "#00FFB3",
+  "#FF3DB8",
+  "#00FFA3",
+  "#FFD400",
+  "#00F5D4",
+  "#FF9A3D",
+  "#7CFFCB",
+  "#B8C0FF"
+];
+function autoLabel(points) {
+  const counts = /* @__PURE__ */ new Map();
+  for (const p of points) {
+    const key = p.cat || p.folder || "Notes";
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+  let best = "Zone";
+  let bestCount = 0;
+  for (const [k, v] of counts) {
+    if (v > bestCount) {
+      bestCount = v;
+      best = k;
+    }
+  }
+  return best;
+}
+function hashPoints(dataPoints) {
+  let h = 0;
+  for (const p of dataPoints) {
+    h = h * 31 + (p.x * 1e5 | 0) | 0;
+    h = h * 31 + (p.y * 1e5 | 0) | 0;
+  }
+  return Math.abs(h) >>> 0;
+}
+function generateMesh(dataPoints, dataBounds, meshDensity) {
+  const seed = hashPoints(dataPoints);
+  const rng = mulberry325(seed);
+  const rangeX = dataBounds.maxX - dataBounds.minX || 0.01;
+  const rangeY = dataBounds.maxY - dataBounds.minY || 0.01;
+  const expand = 0.3;
+  const meshBounds = {
+    minX: dataBounds.minX - rangeX * expand,
+    minY: dataBounds.minY - rangeY * expand,
+    maxX: dataBounds.maxX + rangeX * expand,
+    maxY: dataBounds.maxY + rangeY * expand
+  };
+  const mRangeX = meshBounds.maxX - meshBounds.minX;
+  const mRangeY = meshBounds.maxY - meshBounds.minY;
+  const aspect = mRangeX / mRangeY;
+  const ny = Math.round(Math.sqrt(meshDensity / aspect));
+  const nx = Math.round(ny * aspect);
+  const cellW = mRangeX / nx;
+  const cellH = mRangeY / ny;
+  const jitter = 0.4;
+  const gridPoints = [];
+  for (let iy = 0; iy < ny; iy++) {
+    for (let ix = 0; ix < nx; ix++) {
+      const bx = meshBounds.minX + (ix + 0.5) * cellW;
+      const by = meshBounds.minY + (iy + 0.5) * cellH;
+      const jx = (rng() - 0.5) * 2 * jitter * cellW;
+      const jy = (rng() - 0.5) * 2 * jitter * cellH;
+      gridPoints.push(bx + jx, by + jy);
+    }
+  }
+  const sentinelStart = gridPoints.length / 2;
+  const sentinelDist = Math.max(rangeX, rangeY) * 3;
+  const cxData = (dataBounds.minX + dataBounds.maxX) / 2;
+  const cyData = (dataBounds.minY + dataBounds.maxY) / 2;
+  for (let i = 0; i < 16; i++) {
+    const angle = i / 16 * Math.PI * 2;
+    gridPoints.push(
+      cxData + Math.cos(angle) * sentinelDist,
+      cyData + Math.sin(angle) * sentinelDist
+    );
+  }
+  const fullBounds = {
+    minX: meshBounds.minX - sentinelDist,
+    minY: meshBounds.minY - sentinelDist,
+    maxX: meshBounds.maxX + sentinelDist,
+    maxY: meshBounds.maxY + sentinelDist
+  };
+  const coords = new Float64Array(gridPoints);
+  const totalCount = gridPoints.length / 2;
+  const mesh = voronoiFromDelaunay(coords, totalCount, fullBounds);
+  return { mesh, sentinelStart, meshBounds };
+}
+function assignTerrainAndCountries(mesh, dataPoints, noteClusterIds, sentinelStart, noiseCtx, dataBounds, wmSettings) {
+  const n = mesh.cellCount;
+  const isLand = new Array(n);
+  const cellAssignments = new Array(n);
+  const rangeX = dataBounds.maxX - dataBounds.minX || 0.01;
+  const rangeY = dataBounds.maxY - dataBounds.minY || 0.01;
+  const dataRange = Math.max(rangeX, rangeY);
+  const unity = wmSettings?.unity ?? 0.07;
+  const landThreshold = wmSettings?.seaLevel ?? 0.2;
+  const ruggedness = wmSettings?.ruggedness ?? 0.4;
+  const sigma = dataRange * unity;
+  const invSigma2 = -1 / (sigma * sigma);
+  const cutoffSq = sigma * 3 * (sigma * 3);
+  const warpAmplitude = sigma * ruggedness;
+  const warpFrequency = 3 / dataRange;
+  let maxObservedHeat = 1e-4;
+  for (let i = 0; i < sentinelStart && i < n; i += 15) {
+    let d = 0;
+    const c = mesh.cellCentroids[i];
+    for (let j = 0; j < dataPoints.length; j++) {
+      const dx = c.x - dataPoints[j].x;
+      const dy = c.y - dataPoints[j].y;
+      const dSq = dx * dx + dy * dy;
+      if (dSq < cutoffSq)
+        d += Math.exp(dSq * invSigma2);
+    }
+    if (d > maxObservedHeat)
+      maxObservedHeat = d;
+  }
+  const effectiveThreshold = maxObservedHeat * landThreshold;
+  for (let i = 0; i < n; i++) {
+    if (i >= sentinelStart) {
+      isLand[i] = false;
+      cellAssignments[i] = -1;
+      continue;
+    }
+    const c = mesh.cellCentroids[i];
+    const warped = domainWarp(
+      c.x,
+      c.y,
+      warpAmplitude,
+      warpFrequency,
+      noiseCtx.perm1,
+      noiseCtx.grads1,
+      noiseCtx.perm2,
+      noiseCtx.grads2
+    );
+    let totalDensity = 0;
+    const clusterHeat = {};
+    for (let j = 0; j < dataPoints.length; j++) {
+      const dx = warped.x - dataPoints[j].x;
+      const dy = warped.y - dataPoints[j].y;
+      const dSq = dx * dx + dy * dy;
+      if (dSq > cutoffSq)
+        continue;
+      const heat = Math.exp(dSq * invSigma2);
+      const cid = noteClusterIds[j];
+      totalDensity += heat;
+      clusterHeat[cid] = (clusterHeat[cid] || 0) + heat;
+    }
+    if (totalDensity >= effectiveThreshold) {
+      isLand[i] = true;
+      let maxHeat = 0;
+      let winner = -1;
+      for (const id in clusterHeat) {
+        if (clusterHeat[id] > maxHeat) {
+          maxHeat = clusterHeat[id];
+          winner = Number(id);
+        }
+      }
+      cellAssignments[i] = winner;
+    } else {
+      isLand[i] = false;
+      cellAssignments[i] = -1;
+    }
+  }
+  return { isLand, cellAssignments };
+}
+function healDisconnected(mesh, assignments, isLand) {
+  const n = mesh.cellCount;
+  const clusterIds = /* @__PURE__ */ new Set();
+  for (let i = 0; i < n; i++) {
+    if (assignments[i] >= 0)
+      clusterIds.add(assignments[i]);
+  }
+  for (const clusterId of clusterIds) {
+    const cells = [];
+    for (let i = 0; i < n; i++) {
+      if (assignments[i] === clusterId)
+        cells.push(i);
+    }
+    if (cells.length <= 1)
+      continue;
+    const cellSet = new Set(cells);
+    const visited = /* @__PURE__ */ new Set();
+    const components = [];
+    for (const start of cells) {
+      if (visited.has(start))
+        continue;
+      const component = [];
+      const queue = [start];
+      visited.add(start);
+      while (queue.length > 0) {
+        const cur = queue.pop();
+        component.push(cur);
+        for (const nb of mesh.adjacency[cur]) {
+          if (!visited.has(nb) && cellSet.has(nb)) {
+            visited.add(nb);
+            queue.push(nb);
+          }
+        }
+      }
+      components.push(component);
+    }
+    if (components.length <= 1)
+      continue;
+    let maxSize = 0, maxIdx = 0;
+    for (let i = 0; i < components.length; i++) {
+      if (components[i].length > maxSize) {
+        maxSize = components[i].length;
+        maxIdx = i;
+      }
+    }
+    for (let i = 0; i < components.length; i++) {
+      if (i === maxIdx)
+        continue;
+      const orphan = components[i];
+      let touchesOcean = false;
+      for (const cell of orphan) {
+        for (const nb of mesh.adjacency[cell]) {
+          if (!isLand[nb]) {
+            touchesOcean = true;
+            break;
+          }
+        }
+        if (touchesOcean)
+          break;
+      }
+      if (touchesOcean)
+        continue;
+      const neighborCounts = /* @__PURE__ */ new Map();
+      for (const cell of orphan) {
+        for (const nb of mesh.adjacency[cell]) {
+          const nba = assignments[nb];
+          if (nba >= 0 && nba !== clusterId) {
+            neighborCounts.set(nba, (neighborCounts.get(nba) || 0) + 1);
+          }
+        }
+      }
+      let bestNeighbor = -1, bestCount = 0;
+      for (const [nId, count] of neighborCounts) {
+        if (count > bestCount) {
+          bestCount = count;
+          bestNeighbor = nId;
+        }
+      }
+      if (bestNeighbor >= 0) {
+        for (const cell of orphan)
+          assignments[cell] = bestNeighbor;
+      }
+    }
+  }
+}
+function vKey(p) {
+  return `${Math.round(p.x * 1e6)}_${Math.round(p.y * 1e6)}`;
+}
+function findSharedEdge(polyA, polyB) {
+  const eps = 1e-8;
+  const sharedVerts = [];
+  for (const a of polyA) {
+    for (const b of polyB) {
+      if (Math.abs(a.x - b.x) < eps && Math.abs(a.y - b.y) < eps) {
+        let dup = false;
+        for (const s of sharedVerts) {
+          if (Math.abs(s.x - a.x) < eps && Math.abs(s.y - a.y) < eps) {
+            dup = true;
+            break;
+          }
+        }
+        if (!dup)
+          sharedVerts.push(a);
+      }
+    }
+  }
+  if (sharedVerts.length >= 2) {
+    return { v0: sharedVerts[0], v1: sharedVerts[1] };
+  }
+  return null;
+}
+function extractBorderSegments(mesh, assignments, subDomains) {
+  const n = mesh.cellCount;
+  const segments = [];
+  const visited = /* @__PURE__ */ new Set();
+  for (let i = 0; i < n; i++) {
+    for (const j of mesh.adjacency[i]) {
+      if (j <= i)
+        continue;
+      const domI = assignments[i];
+      const domJ = assignments[j];
+      const subI = subDomains[i];
+      const subJ = subDomains[j];
+      let edgeType = null;
+      if (domI === -1 || domJ === -1) {
+        if (domI !== domJ)
+          edgeType = "coast";
+      } else if (domI !== domJ) {
+        edgeType = "border";
+      } else if (subI !== subJ && subI >= 0 && subJ >= 0) {
+        edgeType = "province";
+      }
+      if (!edgeType)
+        continue;
+      const key = `${Math.min(i, j)}_${Math.max(i, j)}`;
+      if (visited.has(key))
+        continue;
+      visited.add(key);
+      const shared = findSharedEdge(mesh.cellPolygons[i], mesh.cellPolygons[j]);
+      if (shared) {
+        segments.push({
+          v0: shared.v0,
+          v1: shared.v1,
+          leftZone: domI,
+          rightZone: domJ,
+          edgeType
+        });
+      }
+    }
+  }
+  return segments;
+}
+function chainSegments(segs) {
+  if (segs.length === 0)
+    return [];
+  const vertSegs = /* @__PURE__ */ new Map();
+  for (let i = 0; i < segs.length; i++) {
+    const k0 = vKey(segs[i].v0);
+    const k1 = vKey(segs[i].v1);
+    if (!vertSegs.has(k0))
+      vertSegs.set(k0, []);
+    if (!vertSegs.has(k1))
+      vertSegs.set(k1, []);
+    vertSegs.get(k0).push({ segIdx: i, otherEnd: segs[i].v1 });
+    vertSegs.get(k1).push({ segIdx: i, otherEnd: segs[i].v0 });
+  }
+  const usedSegs = /* @__PURE__ */ new Set();
+  const chains = [];
+  for (let startSeg = 0; startSeg < segs.length; startSeg++) {
+    if (usedSegs.has(startSeg))
+      continue;
+    const chain = [segs[startSeg].v0, segs[startSeg].v1];
+    usedSegs.add(startSeg);
+    let done = false;
+    while (!done) {
+      done = true;
+      const lastKey = vKey(chain[chain.length - 1]);
+      const candidates = vertSegs.get(lastKey);
+      if (candidates) {
+        for (const c of candidates) {
+          if (!usedSegs.has(c.segIdx)) {
+            usedSegs.add(c.segIdx);
+            chain.push(c.otherEnd);
+            done = false;
+            break;
+          }
+        }
+      }
+    }
+    done = false;
+    while (!done) {
+      done = true;
+      const firstKey = vKey(chain[0]);
+      const candidates = vertSegs.get(firstKey);
+      if (candidates) {
+        for (const c of candidates) {
+          if (!usedSegs.has(c.segIdx)) {
+            usedSegs.add(c.segIdx);
+            chain.unshift(c.otherEnd);
+            done = false;
+            break;
+          }
+        }
+      }
+    }
+    chains.push(chain);
+  }
+  return chains;
+}
+function fractalDisplaceEdge(pts, iterations, amplitude, seed) {
+  if (pts.length < 2 || iterations <= 0)
+    return pts;
+  let current = pts;
+  for (let iter = 0; iter < iterations; iter++) {
+    const next = [];
+    const amp = amplitude / Math.pow(2, iter);
+    for (let i = 0; i < current.length - 1; i++) {
+      const a = current[i];
+      const b = current[i + 1];
+      next.push(a);
+      const mx = (a.x + b.x) / 2;
+      const my = (a.y + b.y) / 2;
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const len = Math.sqrt(dx * dx + dy * dy);
+      if (len < 1e-10)
+        continue;
+      const px = -dy / len, py = dx / len;
+      let p0 = a, p1 = b;
+      if (a.x > b.x || a.x === b.x && a.y > b.y) {
+        p0 = b;
+        p1 = a;
+      }
+      const edgeHash = (Math.round(p0.x * 1e5) * 73856093 ^ Math.round(p0.y * 1e5) * 19349663 ^ Math.round(p1.x * 1e5) * 83492791 ^ Math.round(p1.y * 1e5) * 45989861) >>> 0;
+      const rng = mulberry325(edgeHash + iter * 7919);
+      const disp = (rng() - 0.5) * 2 * amp;
+      next.push({ x: mx + px * disp, y: my + py * disp });
+    }
+    next.push(current[current.length - 1]);
+    current = next;
+  }
+  return current;
+}
+function chaikinSubdivideOpen(pts, iterations) {
+  if (pts.length < 3)
+    return pts;
+  let current = pts;
+  for (let iter = 0; iter < iterations; iter++) {
+    const next = [];
+    next.push(current[0]);
+    for (let i = 0; i < current.length - 1; i++) {
+      const a = current[i];
+      const b = current[i + 1];
+      if (i > 0) {
+        next.push({ x: a.x * 0.75 + b.x * 0.25, y: a.y * 0.75 + b.y * 0.25 });
+      }
+      if (i < current.length - 2) {
+        next.push({ x: a.x * 0.25 + b.x * 0.75, y: a.y * 0.25 + b.y * 0.75 });
+      }
+    }
+    next.push(current[current.length - 1]);
+    current = next;
+  }
+  return current;
+}
+function chaikinSubdivideClosed(pts, iterations) {
+  if (pts.length < 3)
+    return pts;
+  let current = pts;
+  for (let iter = 0; iter < iterations; iter++) {
+    const next = [];
+    const n = current.length;
+    for (let i = 0; i < n; i++) {
+      const a = current[i];
+      const b = current[(i + 1) % n];
+      next.push(
+        { x: a.x * 0.75 + b.x * 0.25, y: a.y * 0.75 + b.y * 0.25 },
+        { x: a.x * 0.25 + b.x * 0.75, y: a.y * 0.25 + b.y * 0.75 }
+      );
+    }
+    current = next;
+  }
+  return current;
+}
+function buildBorderEdges(segments, dataRange) {
+  const pairMap = /* @__PURE__ */ new Map();
+  for (const seg of segments) {
+    const left = Math.min(seg.leftZone, seg.rightZone);
+    const right = Math.max(seg.leftZone, seg.rightZone);
+    const key = `${left}_${right}_${seg.edgeType}`;
+    if (!pairMap.has(key))
+      pairMap.set(key, []);
+    pairMap.get(key).push(seg);
+  }
+  const borderEdges = [];
+  const amplitude = dataRange * 8e-3;
+  for (const [_key, segs] of pairMap) {
+    if (segs.length === 0)
+      continue;
+    const edgeType = segs[0].edgeType;
+    const chains = chainSegments(segs);
+    for (const chain of chains) {
+      if (chain.length < 2)
+        continue;
+      const seed = (Math.round(chain[0].x * 1e5) * 73856093 ^ Math.round(chain[0].y * 1e5) * 19349663 ^ Math.round(chain[chain.length - 1].x * 1e5) * 83492791 ^ Math.round(chain[chain.length - 1].y * 1e5) * 45989861) >>> 0;
+      const amp = edgeType === "province" ? amplitude * 0.6 : amplitude;
+      let pts = fractalDisplaceEdge(chain, 3, amp, seed);
+      pts = chaikinSubdivideOpen(pts, 2);
+      borderEdges.push({
+        vertices: pts,
+        leftZone: Math.min(segs[0].leftZone, segs[0].rightZone),
+        rightZone: Math.max(segs[0].leftZone, segs[0].rightZone),
+        edgeType
+      });
+    }
+  }
+  return borderEdges;
+}
+function extractCoastline(mesh, landCells) {
+  const eps = 1e-6;
+  const boundaryEdges = [];
+  for (const cellIdx of landCells) {
+    const poly = mesh.cellPolygons[cellIdx];
+    if (!poly || poly.length < 3)
+      continue;
+    for (let i = 0; i < poly.length; i++) {
+      const v0 = poly[i];
+      const v1 = poly[(i + 1) % poly.length];
+      let isInternal = false;
+      for (const nb of mesh.adjacency[cellIdx]) {
+        if (landCells.has(nb)) {
+          const nbPoly = mesh.cellPolygons[nb];
+          if (nbPoly && sharesEdge(v0, v1, nbPoly, eps)) {
+            isInternal = true;
+            break;
+          }
+        }
+      }
+      if (!isInternal) {
+        boundaryEdges.push({ v0, v1 });
+      }
+    }
+  }
+  if (boundaryEdges.length === 0)
+    return [];
+  const fromV1 = /* @__PURE__ */ new Map();
+  for (let i = 0; i < boundaryEdges.length; i++) {
+    const key = vKey(boundaryEdges[i].v1);
+    if (!fromV1.has(key))
+      fromV1.set(key, []);
+    fromV1.get(key).push({ ...boundaryEdges[i], idx: i });
+  }
+  const used = /* @__PURE__ */ new Set();
+  const result = [];
+  const start = boundaryEdges[0];
+  result.push(start.v0);
+  used.add(0);
+  let current = start.v1;
+  result.push(current);
+  for (let step = 0; step < boundaryEdges.length; step++) {
+    const key = vKey(current);
+    const candidates = fromV1.get(key);
+    if (!candidates)
+      break;
+    let found = false;
+    for (const c of candidates) {
+      if (!used.has(c.idx)) {
+      }
+    }
+    if (!found)
+      break;
+  }
+  const fromV0 = /* @__PURE__ */ new Map();
+  for (let i = 0; i < boundaryEdges.length; i++) {
+    const key = vKey(boundaryEdges[i].v0);
+    if (!fromV0.has(key))
+      fromV0.set(key, []);
+    fromV0.get(key).push({ ...boundaryEdges[i], idx: i });
+  }
+  const result2 = [];
+  const used2 = /* @__PURE__ */ new Set();
+  result2.push(boundaryEdges[0].v0);
+  used2.add(0);
+  let cur = boundaryEdges[0].v1;
+  result2.push(cur);
+  for (let step = 0; step < boundaryEdges.length; step++) {
+    const key = vKey(cur);
+    const candidates = fromV0.get(key);
+    if (!candidates)
+      break;
+    let found = false;
+    for (const c of candidates) {
+      if (!used2.has(c.idx)) {
+        used2.add(c.idx);
+        cur = c.v1;
+        result2.push(cur);
+        found = true;
+        break;
+      }
+    }
+    if (!found)
+      break;
+  }
+  return result2;
+}
+function sharesEdge(v0, v1, poly, eps) {
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i];
+    const b = poly[(i + 1) % poly.length];
+    if (Math.abs(v0.x - a.x) < eps && Math.abs(v0.y - a.y) < eps && Math.abs(v1.x - b.x) < eps && Math.abs(v1.y - b.y) < eps || Math.abs(v0.x - b.x) < eps && Math.abs(v0.y - b.y) < eps && Math.abs(v1.x - a.x) < eps && Math.abs(v1.y - a.y) < eps) {
+      return true;
+    }
+  }
+  return false;
+}
+function assembleResult(mesh, assignments, isLand, subDomains, clusterIds, memberPathsByCluster, borderEdges, dataRange) {
+  const zones = [];
+  for (const clusterId of clusterIds) {
+    const members = memberPathsByCluster.get(clusterId);
+    if (!members || members.length === 0)
+      continue;
+    const cellPolys = [];
+    const allVerts = [];
+    const subDomainCellsMap = /* @__PURE__ */ new Map();
+    for (let i = 0; i < mesh.cellCount; i++) {
+      if (assignments[i] === clusterId) {
+        const poly = mesh.cellPolygons[i];
+        if (poly && poly.length >= 3) {
+          cellPolys.push(poly);
+          for (const v of poly)
+            allVerts.push(v);
+          const sub = subDomains[i];
+          if (!subDomainCellsMap.has(sub))
+            subDomainCellsMap.set(sub, []);
+          subDomainCellsMap.get(sub).push(poly);
+        }
+      }
+    }
+    if (cellPolys.length === 0)
+      continue;
+    const hull = convexHull(allVerts);
+    const blob = hull;
+    zones.push({
+      id: clusterId,
+      label: autoLabel(members),
+      color: SEM_PALETTE[clusterId % SEM_PALETTE.length],
+      memberPaths: members.map((m) => m.path),
+      hull,
+      blob,
+      cellPolygons: cellPolys,
+      subDomainCells: subDomainCellsMap
+    });
+  }
+  const clusterAdj = /* @__PURE__ */ new Map();
+  for (const id of clusterIds)
+    clusterAdj.set(id, /* @__PURE__ */ new Set());
+  for (const edge of borderEdges) {
+    if (edge.leftZone >= 0 && edge.rightZone >= 0) {
+      clusterAdj.get(edge.leftZone)?.add(edge.rightZone);
+      clusterAdj.get(edge.rightZone)?.add(edge.leftZone);
+    }
+  }
+  const clusterVisited = /* @__PURE__ */ new Set();
+  const continents = [];
+  let continentId = 0;
+  for (const clusterId of clusterIds) {
+    if (clusterVisited.has(clusterId))
+      continue;
+    const component = [];
+    const queue = [clusterId];
+    clusterVisited.add(clusterId);
+    while (queue.length > 0) {
+      const cur = queue.pop();
+      component.push(cur);
+      const neighbors = clusterAdj.get(cur);
+      if (neighbors) {
+        for (const nb of neighbors) {
+          if (!clusterVisited.has(nb)) {
+            clusterVisited.add(nb);
+            queue.push(nb);
+          }
+        }
+      }
+    }
+    const continentLandCells = /* @__PURE__ */ new Set();
+    for (let i = 0; i < mesh.cellCount; i++) {
+      if (component.includes(assignments[i])) {
+        continentLandCells.add(i);
+      }
+    }
+    let coastline = extractCoastline(mesh, continentLandCells);
+    if (coastline.length >= 3) {
+      const amplitude = dataRange * 0.01;
+      const seed = (Math.round(coastline[0].x * 1e5) * 73856093 ^ Math.round(coastline[0].y * 1e5) * 19349663) >>> 0;
+      coastline = fractalDisplaceEdge(coastline, 3, amplitude, seed);
+      coastline = chaikinSubdivideClosed(coastline, 2);
+    }
+    const allMembers = [];
+    for (const cId of component) {
+      const m = memberPathsByCluster.get(cId);
+      if (m)
+        allMembers.push(...m);
+    }
+    const label = autoLabel(allMembers);
+    continents.push({
+      id: continentId++,
+      zoneIds: component,
+      label,
+      coastline
+    });
+  }
+  return { zones, continents, borderEdges };
+}
+function assignSubDomains(mesh, assignments, subCentroidsByCluster) {
+  const n = mesh.cellCount;
+  const subDomains = new Array(n).fill(-1);
+  for (let i = 0; i < n; i++) {
+    const dom = assignments[i];
+    if (dom < 0)
+      continue;
+    const centroids = subCentroidsByCluster.get(dom);
+    if (!centroids || centroids.length === 0) {
+      subDomains[i] = 0;
+      continue;
+    }
+    const c = mesh.cellCentroids[i];
+    let bestDist = Infinity;
+    let bestSub = 0;
+    for (let s = 0; s < centroids.length; s++) {
+      const dx = c.x - centroids[s].x;
+      const dy = c.y - centroids[s].y;
+      const d = dx * dx + dy * dy;
+      if (d < bestDist) {
+        bestDist = d;
+        bestSub = s;
+      }
+    }
+    subDomains[i] = bestSub;
+  }
+  return subDomains;
+}
+function runWorldMapPipeline(dataPoints, clusterAssignments, k, subCentroidsByCluster, wmSettings) {
+  const groups = /* @__PURE__ */ new Map();
+  for (let i = 0; i < dataPoints.length; i++) {
+    const c = clusterAssignments[i];
+    if (!groups.has(c))
+      groups.set(c, []);
+    groups.get(c).push(dataPoints[i]);
+  }
+  const clusterIds = [];
+  for (const [id, members] of groups) {
+    if (members.length < 2)
+      continue;
+    clusterIds.push(id);
+  }
+  if (clusterIds.length === 0) {
+    return { zones: [], continents: [], borderEdges: [] };
+  }
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const p of dataPoints) {
+    if (p.x < minX)
+      minX = p.x;
+    if (p.x > maxX)
+      maxX = p.x;
+    if (p.y < minY)
+      minY = p.y;
+    if (p.y > maxY)
+      maxY = p.y;
+  }
+  const dataBounds = { minX, minY, maxX, maxY };
+  const rangeX = maxX - minX || 0.01;
+  const rangeY = maxY - minY || 0.01;
+  const dataRange = Math.max(rangeX, rangeY);
+  const seed = hashPoints(dataPoints.map((p) => ({ x: p.x, y: p.y })));
+  const meshDensity = Math.min(4e3, Math.max(1e3, dataPoints.length * 2));
+  const { mesh, sentinelStart } = generateMesh(
+    dataPoints.map((p) => ({ x: p.x, y: p.y })),
+    dataBounds,
+    meshDensity
+  );
+  const noteClusterIds = [];
+  for (let i = 0; i < dataPoints.length; i++) {
+    noteClusterIds.push(clusterAssignments[i]);
+  }
+  const terrainNoise = createNoiseContext(seed);
+  const { isLand, cellAssignments } = assignTerrainAndCountries(
+    mesh,
+    dataPoints.map((p) => ({ x: p.x, y: p.y })),
+    noteClusterIds,
+    sentinelStart,
+    terrainNoise,
+    dataBounds,
+    wmSettings
+  );
+  healDisconnected(mesh, cellAssignments, isLand);
+  const subDomains = subCentroidsByCluster ? assignSubDomains(mesh, cellAssignments, subCentroidsByCluster) : new Array(mesh.cellCount).fill(0);
+  const segments = extractBorderSegments(mesh, cellAssignments, subDomains);
+  const borderEdges = buildBorderEdges(segments, dataRange);
+  const memberPathsByCluster = /* @__PURE__ */ new Map();
+  for (const [id, members] of groups) {
+    if (members.length >= 2)
+      memberPathsByCluster.set(id, members);
+  }
+  return assembleResult(
+    mesh,
+    cellAssignments,
+    isLand,
+    subDomains,
+    clusterIds,
+    memberPathsByCluster,
+    borderEdges,
+    dataRange
+  );
+}
+
+// src/zones.ts
+var SEM_PALETTE2 = [
+  "#00D6FF",
+  "#B9FF00",
+  "#FF7A00",
+  "#A855F7",
+  "#00FFB3",
+  "#FF3DB8",
+  "#00FFA3",
+  "#FFD400",
+  "#00F5D4",
+  "#FF9A3D",
+  "#7CFFCB",
+  "#B8C0FF"
+];
+function cross2(o, a, b) {
+  return (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+}
+function convexHull2(points) {
+  if (points.length <= 2)
+    return [...points];
+  const sorted = [...points].sort((a, b) => a.x - b.x || a.y - b.y);
+  const n = sorted.length;
+  const lower = [];
+  for (const p of sorted) {
+    while (lower.length >= 2 && cross2(lower[lower.length - 2], lower[lower.length - 1], p) <= 0)
+      lower.pop();
+    lower.push(p);
+  }
+  const upper = [];
+  for (let i = n - 1; i >= 0; i--) {
+    const p = sorted[i];
+    while (upper.length >= 2 && cross2(upper[upper.length - 2], upper[upper.length - 1], p) <= 0)
       upper.pop();
     upper.push(p);
   }
@@ -8474,7 +9722,7 @@ function chaikinSubdivide(pts, iterations) {
   }
   return current;
 }
-function autoLabel(points) {
+function autoLabel2(points) {
   const counts = /* @__PURE__ */ new Map();
   for (const p of points) {
     const key = p.cat || p.folder || "Notes";
@@ -8503,7 +9751,7 @@ function computeZones(points, assignments, k) {
     if (members.length < 2)
       continue;
     const pts2d = members.map((m) => ({ x: m.x, y: m.y }));
-    let hull = convexHull(pts2d);
+    let hull = convexHull2(pts2d);
     if (hull.length < 3) {
       const cx = (pts2d[0].x + (pts2d[1]?.x ?? pts2d[0].x)) / 2;
       const cy = (pts2d[0].y + (pts2d[1]?.y ?? pts2d[0].y)) / 2;
@@ -8521,8 +9769,8 @@ function computeZones(points, assignments, k) {
     const blob = chaikinSubdivide(scaled, 3);
     zones.push({
       id,
-      label: autoLabel(members),
-      color: SEM_PALETTE[id % SEM_PALETTE.length],
+      label: autoLabel2(members),
+      color: SEM_PALETTE2[id % SEM_PALETTE2.length],
       memberPaths: members.map((m) => m.path),
       hull: scaled,
       blob
@@ -8530,16 +9778,88 @@ function computeZones(points, assignments, k) {
   }
   return zones;
 }
-function transformZoneToLocal(zone, cx, cy, scale) {
-  const xf = (p) => ({
-    x: (p.x - cx) * scale,
-    y: (p.y - cy) * scale
-  });
-  return {
-    ...zone,
-    hull: zone.hull.map(xf),
-    blob: zone.blob.map(xf)
+function computeWorldMapZones(points, assignments, k, subCentroidsByCluster, wmSettings) {
+  return runWorldMapPipeline(points, assignments, k, subCentroidsByCluster, wmSettings);
+}
+function computeWorldMapSubZones(parentHull, points, assignments, localK) {
+  const groups = /* @__PURE__ */ new Map();
+  for (let i = 0; i < points.length; i++) {
+    const c = assignments[i];
+    if (!groups.has(c))
+      groups.set(c, []);
+    groups.get(c).push(points[i]);
+  }
+  const clusterIds = [...groups.keys()].sort((a, b) => a - b);
+  const centroids = [];
+  const centroidIdMap = [];
+  for (const id of clusterIds) {
+    const members = groups.get(id);
+    if (members.length < 2)
+      continue;
+    let cx = 0, cy = 0;
+    for (const m of members) {
+      cx += m.x;
+      cy += m.y;
+    }
+    centroids.push({ x: cx / members.length, y: cy / members.length });
+    centroidIdMap.push(id);
+  }
+  if (centroids.length === 0 || parentHull.length < 3)
+    return [];
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const p of parentHull) {
+    if (p.x < minX)
+      minX = p.x;
+    if (p.x > maxX)
+      maxX = p.x;
+    if (p.y < minY)
+      minY = p.y;
+    if (p.y > maxY)
+      maxY = p.y;
+  }
+  const padVal = Math.max(maxX - minX, maxY - minY) * 0.1;
+  const bounds = {
+    minX: minX - padVal,
+    minY: minY - padVal,
+    maxX: maxX + padVal,
+    maxY: maxY + padVal
   };
+  const voronoiCells = computeVoronoiCells(centroids, bounds);
+  const range = Math.max(maxX - minX, maxY - minY) || 0.01;
+  const amplitude = range * 0.05;
+  const expandedHull = scaleHull(parentHull, 1.4);
+  const zones = [];
+  for (let ci = 0; ci < centroids.length; ci++) {
+    const id = centroidIdMap[ci];
+    const members = groups.get(id);
+    const voronoiCell = voronoiCells[ci];
+    if (!voronoiCell || voronoiCell.length < 3)
+      continue;
+    const clipped = clipConvexPolygons(voronoiCell, expandedHull);
+    if (clipped.length < 3)
+      continue;
+    const blob = fractalDisplace(clipped, 4, amplitude);
+    zones.push({
+      id,
+      label: autoLabel2(members),
+      color: SEM_PALETTE2[id % SEM_PALETTE2.length],
+      memberPaths: members.map((m) => m.path),
+      hull: clipped,
+      blob
+    });
+  }
+  return zones;
+}
+function drawItalicText(ctx, text, x, y, fillStyle, size) {
+  ctx.save();
+  ctx.font = `${size}px var(--font-interface)`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = fillStyle;
+  ctx.translate(x, y);
+  ctx.transform(1, 0, -0.21, 1, 0, 0);
+  ctx.fillText(text, 0, 0);
+  ctx.restore();
 }
 function hexToRgba(hex, alpha) {
   const n = parseInt(hex.slice(1), 16);
@@ -8548,11 +9868,13 @@ function hexToRgba(hex, alpha) {
   const b = n & 255;
   return `rgba(${r},${g},${b},${alpha})`;
 }
-function drawZone(ctx, zone, w2s, alpha, dashed = false) {
+function drawZone(ctx, zone, w2s, alpha, dashed = false, worldmap = false, skipLabel = false, parentColor, fillFade = 1) {
   const blob = zone.blob;
   if (blob.length < 3)
     return;
   const screenPts = blob.map((p) => w2s(p.x, p.y));
+  const isSubZone = !!parentColor;
+  const color = parentColor || zone.color;
   ctx.save();
   ctx.beginPath();
   ctx.moveTo(screenPts[0].x, screenPts[0].y);
@@ -8560,32 +9882,53 @@ function drawZone(ctx, zone, w2s, alpha, dashed = false) {
     ctx.lineTo(screenPts[i].x, screenPts[i].y);
   }
   ctx.closePath();
-  ctx.fillStyle = hexToRgba(zone.color, 0.1 * alpha);
-  ctx.fill();
-  if (dashed)
-    ctx.setLineDash([6, 4]);
-  ctx.shadowColor = hexToRgba(zone.color, 0.3 * alpha);
-  ctx.shadowBlur = 6;
-  ctx.strokeStyle = hexToRgba(zone.color, 0.35 * alpha);
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
-  ctx.shadowBlur = 0;
-  if (dashed)
+  if (isSubZone) {
+    const fillAlpha = worldmap ? 0.12 : 0.1;
+    ctx.fillStyle = hexToRgba(color, fillAlpha * alpha);
+    ctx.fill();
+    ctx.setLineDash([4, 3]);
+    ctx.strokeStyle = hexToRgba(color, 0.25 * alpha);
+    ctx.lineWidth = 1;
+    ctx.stroke();
     ctx.setLineDash([]);
-  const cx = screenPts.reduce((s, p) => s + p.x, 0) / screenPts.length;
-  const cy = screenPts.reduce((s, p) => s + p.y, 0) / screenPts.length;
-  ctx.font = "600 9px var(--font-interface)";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.letterSpacing = "1.5px";
-  ctx.fillStyle = hexToRgba(zone.color, 0.5 * alpha);
-  ctx.fillText(zone.label.toUpperCase(), cx, cy);
-  ctx.letterSpacing = "0px";
+  } else {
+    const fillAlpha = worldmap ? 0.12 : 0.1;
+    if (fillFade > 0.01) {
+      ctx.fillStyle = hexToRgba(color, fillAlpha * alpha * fillFade);
+      ctx.fill();
+    }
+    if (dashed)
+      ctx.setLineDash([6, 4]);
+    const shadowBlur = worldmap ? 4 : 6;
+    ctx.shadowColor = hexToRgba(color, 0.3 * alpha);
+    ctx.shadowBlur = shadowBlur;
+    ctx.strokeStyle = hexToRgba(color, 0.35 * alpha);
+    ctx.lineWidth = worldmap ? 2 : 1.5;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    if (dashed)
+      ctx.setLineDash([]);
+  }
+  if (!skipLabel) {
+    const cx = screenPts.reduce((s, p) => s + p.x, 0) / screenPts.length;
+    const cy = screenPts.reduce((s, p) => s + p.y, 0) / screenPts.length;
+    if (isSubZone) {
+      drawItalicText(ctx, zone.label, cx, cy, hexToRgba(color, 0.4 * alpha), 7);
+    } else {
+      ctx.font = "600 9px var(--font-interface)";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.letterSpacing = "1.5px";
+      ctx.fillStyle = hexToRgba(color, 0.5 * alpha);
+      ctx.fillText(zone.label.toUpperCase(), cx, cy);
+      ctx.letterSpacing = "0px";
+    }
+  }
   ctx.restore();
 }
 
 // src/zoneNaming.ts
-var import_obsidian6 = require("obsidian");
+var import_obsidian5 = require("obsidian");
 async function generateZoneNames(clusters, apiKey, model = "gpt-4o-mini") {
   const result = /* @__PURE__ */ new Map();
   if (!apiKey || clusters.length === 0)
@@ -8595,7 +9938,7 @@ async function generateZoneNames(clusters, apiKey, model = "gpt-4o-mini") {
     return `Cluster ${c.idx}: ${sample}`;
   }).join("\n");
   try {
-    const resp = await (0, import_obsidian6.requestUrl)({
+    const resp = await (0, import_obsidian5.requestUrl)({
       url: "https://api.openai.com/v1/chat/completions",
       method: "POST",
       headers: {
@@ -8653,7 +9996,7 @@ var FOLDER_COLORS = [
   "#00FFB3",
   "#FF3DB8"
 ];
-var SEM_PALETTE2 = [
+var SEM_PALETTE3 = [
   "#00D6FF",
   "#B9FF00",
   "#FF7A00",
@@ -8676,7 +10019,6 @@ var TYPE_COLORS = {
   REV: "#9AB2AF",
   NOTE: "#5AC6CE"
 };
-var NEIGHBOR_OPTIONS = [5, 10, 15, 20];
 function hexToRgb(hex) {
   const n = parseInt(hex.slice(1), 16);
   return [n >> 16 & 255, n >> 8 & 255, n & 255];
@@ -8699,33 +10041,21 @@ function hashStr(s) {
     h = (h << 5) - h + s.charCodeAt(i) | 0;
   return Math.abs(h);
 }
-function dist2D(a, b) {
-  const dx = a.x - b.x, dy = a.y - b.y;
-  return Math.sqrt(dx * dx + dy * dy);
-}
 var DARK = {
   panelBg: "rgba(15,15,26,0.92)",
-  labelPillBg: "rgba(15,15,26,0.75)",
   panelBorder: "rgba(44,44,58,0.6)",
   text: "#D6D6E0",
   textMuted: "#8E9AAF",
-  minimapDimPoint: "rgba(142,154,175,0.45)",
-  linkStroke: "rgba(214,214,224,0.18)",
-  linkStrokeLocal: "rgba(214,214,224,0.15)",
-  connectorLine: "rgba(142,154,175,0.2)"
+  linkStroke: "rgba(214,214,224,0.18)"
 };
 var LIGHT = {
   panelBg: "rgba(255,255,255,0.92)",
-  labelPillBg: "rgba(255,255,255,0.78)",
   panelBorder: "rgba(160,160,180,0.4)",
   text: "#1e1e2e",
   textMuted: "#6e6e80",
-  minimapDimPoint: "rgba(100,100,120,0.4)",
-  linkStroke: "rgba(60,60,80,0.22)",
-  linkStrokeLocal: "rgba(60,60,80,0.18)",
-  connectorLine: "rgba(100,100,120,0.25)"
+  linkStroke: "rgba(60,60,80,0.22)"
 };
-var ChorographiaView = class extends import_obsidian7.ItemView {
+var ChorographiaView = class extends import_obsidian6.ItemView {
   constructor(leaf, plugin) {
     super(leaf);
     this.dpr = 1;
@@ -8733,6 +10063,8 @@ var ChorographiaView = class extends import_obsidian7.ItemView {
     this.allPoints = [];
     this.points = [];
     this.zones = [];
+    this.continents = [];
+    this.borderEdges = [];
     this.subZonesMap = /* @__PURE__ */ new Map();
     // globalZoneId → sub-zones (global coords)
     this.zoom = 1;
@@ -8740,14 +10072,15 @@ var ChorographiaView = class extends import_obsidian7.ItemView {
     this.panY = 0;
     this.hoverIdx = -1;
     this.selectedIdx = -1;
-    // local view
-    this.viewMode = "global";
-    this.localCenterPath = "";
-    this.localNeighborCount = 10;
-    this.localZones = [];
-    this.localCX = 0;
-    this.localCY = 0;
-    this.localScale = 1;
+    // animation
+    this.animating = false;
+    this.animStartTime = 0;
+    this.animDuration = 800;
+    this.animStartPanX = 0;
+    this.animStartPanY = 0;
+    this.animTargetPanX = 0;
+    this.animTargetPanY = 0;
+    this.animFrameId = 0;
     // drag
     this.dragging = false;
     this.dragStartX = 0;
@@ -8796,45 +10129,16 @@ var ChorographiaView = class extends import_obsidian7.ItemView {
     this.syncActiveNoteSelection();
   }
   async onClose() {
+    cancelAnimationFrame(this.animFrameId);
   }
   // ===================== controls =====================
   buildControls(root) {
-    const bar = root.createEl("div", { cls: "chorographia-controls" });
-    this.viewSwitchEl = bar.createEl("div", { cls: "chorographia-view-switch" });
-    const globalLabel = this.viewSwitchEl.createEl("span", { cls: "switch-label is-active", text: "Global" });
-    const track = this.viewSwitchEl.createEl("div", { cls: "switch-track" });
-    track.createEl("div", { cls: "switch-thumb" });
-    const localLabel = this.viewSwitchEl.createEl("span", { cls: "switch-label", text: "Local" });
-    const toggleView = () => {
-      if (this.viewMode === "global") {
-        if (this.selectedIdx >= 0)
-          this.enterLocalView(this.points[this.selectedIdx].path);
-      } else {
-        this.enterGlobalView();
-      }
-    };
-    this.viewSwitchEl.addEventListener("click", toggleView);
-    this.viewSwitchEl.addEventListener("touchend", (e) => {
-      e.preventDefault();
-      toggleView();
-    });
-    this.neighborGroup = bar.createEl("span", { cls: "chorographia-neighbor-group" });
-    this.neighborGroup.style.display = "none";
-    this.neighborGroup.createEl("span", { cls: "chorographia-sep" });
-    const nearLabel = this.neighborGroup.createEl("span", { text: "Near:" });
-    nearLabel.style.marginRight = "4px";
-    this.neighborSelect = this.neighborGroup.createEl("select");
-    for (const n of NEIGHBOR_OPTIONS)
-      this.neighborSelect.createEl("option", { text: String(n), value: String(n) });
-    this.neighborSelect.value = "10";
-    this.neighborSelect.addEventListener("change", () => {
-      this.localNeighborCount = parseInt(this.neighborSelect.value, 10);
-      if (this.viewMode === "local" && this.localCenterPath)
-        this.enterLocalView(this.localCenterPath);
-    });
-    bar.createEl("span", { cls: "chorographia-sep" });
-    bar.createEl("span", { text: "Color:" }).style.marginRight = "4px";
-    this.colorModeSelect = bar.createEl("select");
+    this.menuBtn = root.createEl("button", { cls: "chorographia-menu-btn", attr: { "aria-label": "Map settings" } });
+    this.menuBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`;
+    this.menuPanel = root.createEl("div", { cls: "chorographia-menu" });
+    const colorRow = this.menuPanel.createEl("div", { cls: "chorographia-menu-row" });
+    colorRow.createEl("span", { text: "Color" });
+    this.colorModeSelect = colorRow.createEl("select");
     for (const [v, t] of [
       ["semantic", "Semantic"],
       ["folder", "Folder"],
@@ -8848,26 +10152,70 @@ var ChorographiaView = class extends import_obsidian7.ItemView {
       await this.plugin.saveSettings();
       this.draw();
     });
-    bar.createEl("span", { cls: "chorographia-sep" });
-    const lbl = bar.createEl("label", { cls: "chorographia-toggle-label" });
-    this.linksToggle = lbl.createEl("input", { type: "checkbox" });
+    const linksRow = this.menuPanel.createEl("div", { cls: "chorographia-menu-row" });
+    const linksLbl = linksRow.createEl("label", { cls: "chorographia-toggle-label" });
+    this.linksToggle = linksLbl.createEl("input", { type: "checkbox" });
     this.linksToggle.checked = this.plugin.settings.showLinks;
-    lbl.appendText(" Links");
+    linksLbl.appendText(" Links");
     this.linksToggle.addEventListener("change", async () => {
       this.plugin.settings.showLinks = this.linksToggle.checked;
       await this.plugin.saveSettings();
       this.draw();
     });
-    bar.createEl("span", { cls: "chorographia-sep" });
-    const zoneLbl = bar.createEl("label", { cls: "chorographia-toggle-label" });
-    this.zonesToggle = zoneLbl.createEl("input", { type: "checkbox" });
+    const zonesRow = this.menuPanel.createEl("div", { cls: "chorographia-menu-row" });
+    const zonesLbl = zonesRow.createEl("label", { cls: "chorographia-toggle-label" });
+    this.zonesToggle = zonesLbl.createEl("input", { type: "checkbox" });
     this.zonesToggle.checked = this.plugin.settings.showZones;
-    zoneLbl.appendText(" Zones");
+    zonesLbl.appendText(" Zones");
     this.zonesToggle.addEventListener("change", async () => {
       this.plugin.settings.showZones = this.zonesToggle.checked;
       await this.plugin.saveSettings();
       this.draw();
     });
+    const subZonesRow = this.menuPanel.createEl("div", { cls: "chorographia-menu-row" });
+    const subZonesLbl = subZonesRow.createEl("label", { cls: "chorographia-toggle-label" });
+    this.subZonesToggle = subZonesLbl.createEl("input", { type: "checkbox" });
+    this.subZonesToggle.checked = this.plugin.settings.showSubZones;
+    subZonesLbl.appendText(" Sub-zones");
+    this.subZonesToggle.addEventListener("change", async () => {
+      this.plugin.settings.showSubZones = this.subZonesToggle.checked;
+      await this.plugin.saveSettings();
+      this.draw();
+    });
+    const titlesRow = this.menuPanel.createEl("div", { cls: "chorographia-menu-row" });
+    const titlesLbl = titlesRow.createEl("label", { cls: "chorographia-toggle-label" });
+    this.titlesToggle = titlesLbl.createEl("input", { type: "checkbox" });
+    this.titlesToggle.checked = this.plugin.settings.showNoteTitles;
+    titlesLbl.appendText(" Titles");
+    this.titlesToggle.addEventListener("change", async () => {
+      this.plugin.settings.showNoteTitles = this.titlesToggle.checked;
+      await this.plugin.saveSettings();
+      this.draw();
+    });
+    const minimapRow = this.menuPanel.createEl("div", { cls: "chorographia-menu-row" });
+    minimapRow.createEl("span", { text: "Minimap" });
+    this.minimapSelect = minimapRow.createEl("select");
+    for (const [v, t] of [
+      ["off", "Off"],
+      ["top-left", "TL"],
+      ["top-right", "TR"],
+      ["bottom-left", "BL"],
+      ["bottom-right", "BR"]
+    ])
+      this.minimapSelect.createEl("option", { text: t, value: v });
+    this.minimapSelect.value = this.plugin.settings.minimapCorner;
+    this.minimapSelect.addEventListener("change", async () => {
+      this.plugin.settings.minimapCorner = this.minimapSelect.value;
+      await this.plugin.saveSettings();
+      this.draw();
+    });
+    this.menuBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.menuPanel.classList.toggle("is-open");
+    });
+    this.canvas.addEventListener("mousedown", () => {
+      this.menuPanel.classList.remove("is-open");
+    }, true);
   }
   // ===================== data =====================
   async loadPoints() {
@@ -8902,13 +10250,19 @@ var ChorographiaView = class extends import_obsidian7.ItemView {
     this.hoverIdx = -1;
     this.selectedIdx = -1;
     this.updateStatus();
-    await this.computeAndCacheZones();
+    try {
+      await this.computeAndCacheZones();
+    } catch (e) {
+      console.error("Chorographia: zone computation failed", e);
+    }
     this.draw();
   }
   async computeAndCacheZones() {
     const k = this.plugin.settings.zoneGranularity;
     const model = this.plugin.embeddingModelString;
-    const cacheKey = `${k}_${model}`;
+    const s = this.plugin.settings;
+    const cacheKey = s.zoneStyle === "worldmap" ? `${k}_${model}_worldmap_${s.worldmapSeaLevel}_${s.worldmapUnity}_${s.worldmapRuggedness}` : `${k}_${model}_${s.zoneStyle}`;
+    const isWorldmap = this.plugin.settings.zoneStyle === "worldmap";
     const cached = this.plugin.cache.zones?.[cacheKey];
     if (cached && cached.subAssignments) {
       const assignments2 = [];
@@ -8920,7 +10274,49 @@ var ChorographiaView = class extends import_obsidian7.ItemView {
         }
       }
       if (pointsForZones2.length > 0) {
-        this.zones = computeZones(pointsForZones2, assignments2, k);
+        if (isWorldmap) {
+          const subCentroidsByCluster2 = /* @__PURE__ */ new Map();
+          if (cached.subAssignments) {
+            for (const zoneIdStr of Object.keys(cached.subAssignments)) {
+              const zoneId = Number(zoneIdStr);
+              const subAssign = cached.subAssignments[zoneId];
+              if (!subAssign)
+                continue;
+              const subGroups = /* @__PURE__ */ new Map();
+              for (const p of this.allPoints) {
+                if (subAssign[p.path] != null) {
+                  const s2 = subAssign[p.path];
+                  if (!subGroups.has(s2))
+                    subGroups.set(s2, []);
+                  subGroups.get(s2).push({ x: p.x, y: p.y });
+                }
+              }
+              const subCentroids = [];
+              for (const [_, pts] of [...subGroups].sort((a, b) => a[0] - b[0])) {
+                let cx = 0, cy = 0;
+                for (const p of pts) {
+                  cx += p.x;
+                  cy += p.y;
+                }
+                subCentroids.push({ x: cx / pts.length, y: cy / pts.length });
+              }
+              subCentroidsByCluster2.set(zoneId, subCentroids);
+            }
+          }
+          const wmSettings = {
+            seaLevel: this.plugin.settings.worldmapSeaLevel,
+            unity: this.plugin.settings.worldmapUnity,
+            ruggedness: this.plugin.settings.worldmapRuggedness
+          };
+          const result = computeWorldMapZones(pointsForZones2, assignments2, k, subCentroidsByCluster2, wmSettings);
+          this.zones = result.zones;
+          this.continents = result.continents;
+          this.borderEdges = result.borderEdges;
+        } else {
+          this.zones = computeZones(pointsForZones2, assignments2, k);
+          this.continents = [];
+          this.borderEdges = [];
+        }
         for (const zone of this.zones) {
           if (cached.labels[zone.id])
             zone.label = cached.labels[zone.id];
@@ -8941,7 +10337,7 @@ var ChorographiaView = class extends import_obsidian7.ItemView {
             }
             if (subPts.length > 0) {
               const localK2 = Math.max(2, Math.round(k / 4));
-              const subZones = computeZones(subPts, subIdx, localK2);
+              const subZones = isWorldmap ? computeWorldMapSubZones(zone.hull, subPts, subIdx, localK2) : computeZones(subPts, subIdx, localK2);
               const subLabels = cached.subLabels?.[zone.id];
               if (subLabels) {
                 for (const sz of subZones) {
@@ -8993,7 +10389,33 @@ var ChorographiaView = class extends import_obsidian7.ItemView {
       this.subZonesMap.clear();
       return;
     }
-    const { assignments, centroids } = kMeans(vectors, k);
+    let assignments;
+    let centroids;
+    const locked = this.plugin.settings.mapLocked;
+    const lockedCentroids = this.plugin.cache.lockedCentroids;
+    if (locked && lockedCentroids && lockedCentroids.length > 0) {
+      centroids = lockedCentroids.map((c) => decodeFloat32(c));
+      assignments = vectors.map((v) => {
+        let bestIdx = 0, bestDist = Infinity;
+        for (let c = 0; c < centroids.length; c++) {
+          let sum = 0;
+          for (let d = 0; d < v.length; d++) {
+            const diff = v[d] - centroids[c][d];
+            sum += diff * diff;
+          }
+          const dist = Math.sqrt(sum);
+          if (dist < bestDist) {
+            bestDist = dist;
+            bestIdx = c;
+          }
+        }
+        return bestIdx;
+      });
+    } else {
+      const result = kMeans(vectors, k);
+      assignments = result.assignments;
+      centroids = result.centroids;
+    }
     const assignMap = {};
     for (let i = 0; i < paths.length; i++) {
       assignMap[paths[i]] = assignments[i];
@@ -9006,63 +10428,111 @@ var ChorographiaView = class extends import_obsidian7.ItemView {
         pointsForZones.push(p);
       }
     }
-    this.zones = computeZones(pointsForZones, pointAssignments, k);
-    const labelMap = {};
-    for (const z of this.zones)
-      labelMap[z.id] = z.label;
-    if (this.plugin.settings.enableLLMZoneNaming) {
-      const clusters = this.zones.map((z) => ({
-        idx: z.id,
-        titles: z.memberPaths.map((p) => {
-          const note = this.plugin.cache.notes[p];
-          return note?.title || p.split("/").pop() || p;
-        })
-      }));
-      let llmNames = /* @__PURE__ */ new Map();
-      if (this.plugin.settings.llmProvider === "ollama") {
-        llmNames = await generateZoneNamesOllama(clusters, this.plugin.settings.ollamaUrl, this.plugin.settings.ollamaLlmModel);
-      } else if (this.plugin.settings.llmProvider === "openai" && this.plugin.settings.openaiApiKey) {
-        llmNames = await generateZoneNames(clusters, this.plugin.settings.openaiApiKey);
-      } else if (this.plugin.settings.llmProvider === "openrouter" && this.plugin.settings.openrouterApiKey) {
-        llmNames = await generateZoneNamesOpenRouter(clusters, this.plugin.settings.openrouterApiKey, this.plugin.settings.openrouterLlmModel);
-      }
-      for (const [idx, name] of llmNames) {
-        labelMap[idx] = name;
-        const zone = this.zones.find((z) => z.id === idx);
-        if (zone)
-          zone.label = name;
-      }
-    }
-    const localK = Math.max(2, Math.round(k / 4));
-    const subAssignmentsCache = {};
-    const subLabelsCache = {};
-    const allSubClusters = [];
-    this.subZonesMap.clear();
     const vecByPath = /* @__PURE__ */ new Map();
     for (let i = 0; i < paths.length; i++)
       vecByPath.set(paths[i], vectors[i]);
+    const localK = Math.max(2, Math.round(k / 4));
+    const subAssignmentsCache = {};
+    const subLabelsCache = {};
+    const clusterMembers = /* @__PURE__ */ new Map();
+    for (let i = 0; i < paths.length; i++) {
+      const c = assignments[i];
+      if (!clusterMembers.has(c))
+        clusterMembers.set(c, []);
+      const pt = this.allPoints.find((p) => p.path === paths[i]);
+      if (pt)
+        clusterMembers.get(c).push({ path: paths[i], vec: vectors[i], x: pt.x, y: pt.y });
+    }
+    const subCentroidsByCluster = /* @__PURE__ */ new Map();
+    for (const [clusterId, members] of clusterMembers) {
+      if (members.length < localK)
+        continue;
+      const { assignments: subAssignments } = kMeans(members.map((m) => m.vec), localK);
+      const subAssignMap = {};
+      for (let i = 0; i < members.length; i++)
+        subAssignMap[members[i].path] = subAssignments[i];
+      subAssignmentsCache[clusterId] = subAssignMap;
+      const subGroups = /* @__PURE__ */ new Map();
+      for (let i = 0; i < members.length; i++) {
+        const s2 = subAssignments[i];
+        if (!subGroups.has(s2))
+          subGroups.set(s2, []);
+        subGroups.get(s2).push({ x: members[i].x, y: members[i].y });
+      }
+      const subCentroids = [];
+      for (const [_, pts] of [...subGroups].sort((a, b) => a[0] - b[0])) {
+        let cx = 0, cy = 0;
+        for (const p of pts) {
+          cx += p.x;
+          cy += p.y;
+        }
+        subCentroids.push({ x: cx / pts.length, y: cy / pts.length });
+      }
+      subCentroidsByCluster.set(clusterId, subCentroids);
+    }
+    if (isWorldmap) {
+      const wmSettings = {
+        seaLevel: this.plugin.settings.worldmapSeaLevel,
+        unity: this.plugin.settings.worldmapUnity,
+        ruggedness: this.plugin.settings.worldmapRuggedness
+      };
+      const result = computeWorldMapZones(pointsForZones, pointAssignments, k, subCentroidsByCluster, wmSettings);
+      this.zones = result.zones;
+      this.continents = result.continents;
+      this.borderEdges = result.borderEdges;
+    } else {
+      this.zones = computeZones(pointsForZones, pointAssignments, k);
+      this.continents = [];
+      this.borderEdges = [];
+    }
+    const labelMap = {};
+    for (const z of this.zones)
+      labelMap[z.id] = z.label;
+    const skipLLMNaming = locked && this.plugin.cache.lockedLabels && Object.keys(this.plugin.cache.lockedLabels).length > 0;
+    if (this.plugin.settings.enableLLMZoneNaming && !skipLLMNaming) {
+      try {
+        const clusters = this.zones.map((z) => ({
+          idx: z.id,
+          titles: z.memberPaths.map((p) => {
+            const note = this.plugin.cache.notes[p];
+            return note?.title || p.split("/").pop() || p;
+          })
+        }));
+        let llmNames = /* @__PURE__ */ new Map();
+        if (this.plugin.settings.llmProvider === "ollama") {
+          llmNames = await generateZoneNamesOllama(clusters, this.plugin.settings.ollamaUrl, this.plugin.settings.ollamaLlmModel);
+        } else if (this.plugin.settings.llmProvider === "openai" && this.plugin.settings.openaiApiKey) {
+          llmNames = await generateZoneNames(clusters, this.plugin.settings.openaiApiKey);
+        } else if (this.plugin.settings.llmProvider === "openrouter" && this.plugin.settings.openrouterApiKey) {
+          llmNames = await generateZoneNamesOpenRouter(clusters, this.plugin.settings.openrouterApiKey, this.plugin.settings.openrouterLlmModel);
+        }
+        for (const [idx, name] of llmNames) {
+          labelMap[idx] = name;
+          const zone = this.zones.find((z) => z.id === idx);
+          if (zone)
+            zone.label = name;
+        }
+      } catch (e) {
+        console.error("Chorographia: LLM zone naming failed", e);
+      }
+    }
+    const allSubClusters = [];
+    this.subZonesMap.clear();
     for (const zone of this.zones) {
-      const memberVecs = [];
-      const memberPaths = [];
-      for (const p of zone.memberPaths) {
-        const v = vecByPath.get(p);
-        if (v) {
-          memberVecs.push(v);
-          memberPaths.push(p);
+      const subAssignMap = subAssignmentsCache[zone.id];
+      if (!subAssignMap)
+        continue;
+      const subPts = [];
+      const subIdx = [];
+      for (const p of this.allPoints) {
+        if (subAssignMap[p.path] != null) {
+          subPts.push({ path: p.path, x: p.x, y: p.y, folder: p.folder, cat: p.cat });
+          subIdx.push(subAssignMap[p.path]);
         }
       }
-      if (memberVecs.length < localK)
+      if (subPts.length === 0)
         continue;
-      const { assignments: subAssignments } = kMeans(memberVecs, localK);
-      const subAssignMap = {};
-      for (let i = 0; i < memberPaths.length; i++)
-        subAssignMap[memberPaths[i]] = subAssignments[i];
-      subAssignmentsCache[zone.id] = subAssignMap;
-      const subPts = memberPaths.map((path) => {
-        const pt = this.allPoints.find((p) => p.path === path);
-        return { path: pt.path, x: pt.x, y: pt.y, folder: pt.folder, cat: pt.cat };
-      });
-      const subZones = computeZones(subPts, subAssignments, localK);
+      const subZones = isWorldmap ? computeWorldMapSubZones(zone.hull, subPts, subIdx, localK) : computeZones(subPts, subIdx, localK);
       const subLabelMap = {};
       for (const sz of subZones)
         subLabelMap[sz.id] = sz.label;
@@ -9079,26 +10549,53 @@ var ChorographiaView = class extends import_obsidian7.ItemView {
       subLabelsCache[zone.id] = subLabelMap;
       this.subZonesMap.set(zone.id, subZones);
     }
-    if (this.plugin.settings.enableLLMZoneNaming && allSubClusters.length > 0) {
-      const batchClusters = allSubClusters.map((c, i) => ({
-        idx: i,
-        titles: c.titles
-      }));
-      let llmNames = /* @__PURE__ */ new Map();
-      if (this.plugin.settings.llmProvider === "ollama") {
-        llmNames = await generateZoneNamesOllama(batchClusters, this.plugin.settings.ollamaUrl, this.plugin.settings.ollamaLlmModel);
-      } else if (this.plugin.settings.llmProvider === "openai" && this.plugin.settings.openaiApiKey) {
-        llmNames = await generateZoneNames(batchClusters, this.plugin.settings.openaiApiKey);
-      } else if (this.plugin.settings.llmProvider === "openrouter" && this.plugin.settings.openrouterApiKey) {
-        llmNames = await generateZoneNamesOpenRouter(batchClusters, this.plugin.settings.openrouterApiKey, this.plugin.settings.openrouterLlmModel);
+    if (this.plugin.settings.enableLLMZoneNaming && !skipLLMNaming && allSubClusters.length > 0) {
+      try {
+        const batchClusters = allSubClusters.map((c, i) => ({
+          idx: i,
+          titles: c.titles
+        }));
+        let llmNames = /* @__PURE__ */ new Map();
+        if (this.plugin.settings.llmProvider === "ollama") {
+          llmNames = await generateZoneNamesOllama(batchClusters, this.plugin.settings.ollamaUrl, this.plugin.settings.ollamaLlmModel);
+        } else if (this.plugin.settings.llmProvider === "openai" && this.plugin.settings.openaiApiKey) {
+          llmNames = await generateZoneNames(batchClusters, this.plugin.settings.openaiApiKey);
+        } else if (this.plugin.settings.llmProvider === "openrouter" && this.plugin.settings.openrouterApiKey) {
+          llmNames = await generateZoneNamesOpenRouter(batchClusters, this.plugin.settings.openrouterApiKey, this.plugin.settings.openrouterLlmModel);
+        }
+        for (const [batchIdx, name] of llmNames) {
+          const c = allSubClusters[batchIdx];
+          subLabelsCache[c.zoneId][c.idx] = name;
+          const subZones = this.subZonesMap.get(c.zoneId);
+          const sz = subZones?.find((z) => z.id === c.idx);
+          if (sz)
+            sz.label = name;
+        }
+      } catch (e) {
+        console.error("Chorographia: LLM sub-zone naming failed", e);
       }
-      for (const [batchIdx, name] of llmNames) {
-        const c = allSubClusters[batchIdx];
-        subLabelsCache[c.zoneId][c.idx] = name;
-        const subZones = this.subZonesMap.get(c.zoneId);
-        const sz = subZones?.find((z) => z.id === c.idx);
-        if (sz)
-          sz.label = name;
+    }
+    if (locked && this.plugin.cache.lockedLabels) {
+      for (const zone of this.zones) {
+        const lockedLabel = this.plugin.cache.lockedLabels[zone.id];
+        if (lockedLabel) {
+          zone.label = lockedLabel;
+          labelMap[zone.id] = lockedLabel;
+        }
+      }
+    }
+    if (locked && this.plugin.cache.lockedSubLabels) {
+      for (const [zoneId, subZones] of this.subZonesMap) {
+        const lockedSubs = this.plugin.cache.lockedSubLabels[zoneId];
+        if (!lockedSubs)
+          continue;
+        for (const sz of subZones) {
+          const lockedLabel = lockedSubs[sz.id];
+          if (lockedLabel) {
+            sz.label = lockedLabel;
+            subLabelsCache[zoneId][sz.id] = lockedLabel;
+          }
+        }
       }
     }
     if (!this.plugin.cache.zones)
@@ -9115,75 +10612,39 @@ var ChorographiaView = class extends import_obsidian7.ItemView {
     };
     await this.plugin.saveCache();
   }
-  // ===================== view switching =====================
-  enterLocalView(centerPath) {
-    const center = this.allPoints.find((p) => p.path === centerPath);
-    if (!center)
-      return;
-    this.localCenterPath = centerPath;
-    const sorted = this.allPoints.map((p) => ({ p, d: dist2D(center, p) })).sort((a, b) => a.d - b.d).slice(0, this.localNeighborCount + 1);
-    const localPts = sorted.map((s) => ({ ...s.p }));
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-    for (const p of localPts) {
-      if (p.x < minX)
-        minX = p.x;
-      if (p.x > maxX)
-        maxX = p.x;
-      if (p.y < minY)
-        minY = p.y;
-      if (p.y > maxY)
-        maxY = p.y;
-    }
-    const cx = (minX + maxX) / 2;
-    const cy = (minY + maxY) / 2;
-    const range = Math.max(maxX - minX, maxY - minY) || 0.01;
-    const scale = 1.6 / range;
-    for (const p of localPts) {
-      p.x = (p.x - cx) * scale;
-      p.y = (p.y - cy) * scale;
-    }
-    this.localCX = cx;
-    this.localCY = cy;
-    this.localScale = scale;
-    this.localZones = [];
-    const parentZone = this.zones.find((z) => z.memberPaths.includes(centerPath));
-    if (parentZone) {
-      const subZones = this.subZonesMap.get(parentZone.id);
-      if (subZones) {
-        this.localZones = subZones.map(
-          (sz) => transformZoneToLocal(sz, cx, cy, scale)
-        );
-      }
-    }
-    this.points = localPts;
-    this.selectedIdx = localPts.findIndex((p) => p.path === centerPath);
-    this.hoverIdx = -1;
-    this.zoom = 1;
-    this.panX = 0;
-    this.panY = 0;
-    this.viewMode = "local";
-    this.viewSwitchEl.classList.add("is-local");
-    this.updateSwitchLabels();
-    this.neighborGroup.style.display = "inline-flex";
-    this.updateStatus();
-    this.draw();
+  // ===================== animation =====================
+  animateTo(worldX, worldY) {
+    const w = this.canvas.clientWidth, h = this.canvas.clientHeight;
+    const s = Math.min(w, h) * 0.42 * this.zoom;
+    this.animStartPanX = this.panX;
+    this.animStartPanY = this.panY;
+    this.animTargetPanX = -worldX * s;
+    this.animTargetPanY = worldY * s;
+    this.animStartTime = performance.now();
+    this.animating = true;
+    this.animFrameId = requestAnimationFrame((now) => this.animTick(now));
   }
-  enterGlobalView() {
-    this.points = this.allPoints;
-    this.hoverIdx = -1;
-    this.selectedIdx = -1;
-    this.localCenterPath = "";
-    this.localZones = [];
-    this.zoom = 1;
-    this.panX = 0;
-    this.panY = 0;
-    this.viewMode = "global";
-    this.viewSwitchEl.classList.remove("is-local");
-    this.updateSwitchLabels();
-    this.neighborGroup.style.display = "none";
-    this.syncActiveNoteSelection();
-    this.updateStatus();
+  animTick(now) {
+    if (!this.animating)
+      return;
+    let t = (now - this.animStartTime) / this.animDuration;
+    if (t >= 1) {
+      t = 1;
+      this.animating = false;
+    }
+    const ease = 1 - Math.pow(1 - t, 3);
+    this.panX = this.animStartPanX + (this.animTargetPanX - this.animStartPanX) * ease;
+    this.panY = this.animStartPanY + (this.animTargetPanY - this.animStartPanY) * ease;
     this.draw();
+    if (this.animating) {
+      this.animFrameId = requestAnimationFrame((now2) => this.animTick(now2));
+    }
+  }
+  cancelAnimation() {
+    if (this.animating) {
+      this.animating = false;
+      cancelAnimationFrame(this.animFrameId);
+    }
   }
   // ===================== coordinate transforms =====================
   resizeCanvas() {
@@ -9226,10 +10687,10 @@ var ChorographiaView = class extends import_obsidian7.ItemView {
   semColor(p) {
     if (p.semA < 0)
       return this.folderColorMap.get(p.folder) || FOLDER_COLORS[0];
-    const cA = SEM_PALETTE2[p.semA % SEM_PALETTE2.length];
+    const cA = SEM_PALETTE3[p.semA % SEM_PALETTE3.length];
     if (p.semB < 0 || p.semA === p.semB)
       return cA;
-    return lerpColor(cA, SEM_PALETTE2[p.semB % SEM_PALETTE2.length], 1 - (SEM_SPLIT[p.semW] ?? 0.5));
+    return lerpColor(cA, SEM_PALETTE3[p.semB % SEM_PALETTE3.length], 1 - (SEM_SPLIT[p.semW] ?? 0.5));
   }
   // ===================== draw =====================
   draw() {
@@ -9245,35 +10706,285 @@ var ChorographiaView = class extends import_obsidian7.ItemView {
       ctx.fillText("No points. Run re-embed + recompute layout in settings.", W / 2, H / 2);
       return;
     }
-    const isLocal = this.viewMode === "local";
     const showLinks = this.plugin.settings.showLinks;
     const isSem = this.plugin.settings.colorMode === "semantic";
+    const zoom = this.zoom;
     const idx = /* @__PURE__ */ new Map();
     pts.forEach((p, i) => idx.set(p.path, i));
     const scr = pts.map((p) => this.w2s(p.x, p.y));
-    if (this.plugin.settings.showZones) {
+    if (this.plugin.settings.showZones && this.zones.length > 0) {
       const w2sFn = (wx, wy) => this.w2s(wx, wy);
-      if (isLocal) {
-        if (this.zones.length > 0) {
-          const centerZone = this.zones.find((z) => z.memberPaths.includes(this.localCenterPath));
-          if (centerZone) {
-            const transformed = transformZoneToLocal(centerZone, this.localCX, this.localCY, this.localScale);
-            drawZone(ctx, transformed, w2sFn, 0.4);
+      const isWorldmap = this.plugin.settings.zoneStyle === "worldmap";
+      const isDarkTheme = document.body.classList.contains("theme-dark");
+      let subAlpha = Math.max(0, Math.min(1, (zoom - 2) / 3));
+      if (!this.plugin.settings.showSubZones)
+        subAlpha = 0;
+      const globalZoneAlpha = 1 - subAlpha * 0.3;
+      const parentFillFade = 1 - subAlpha;
+      if (isWorldmap && this.continents.length > 0) {
+        ctx.fillStyle = isDarkTheme ? "#0a0e1a" : "#e8eef5";
+        ctx.fillRect(0, 0, W, H);
+        const zoneById = /* @__PURE__ */ new Map();
+        for (const zone of this.zones)
+          zoneById.set(zone.id, zone);
+        for (const continent of this.continents) {
+          const memberZones = continent.zoneIds.map((id) => zoneById.get(id)).filter((z) => !!z);
+          if (memberZones.length === 0)
+            continue;
+          if (continent.coastline && continent.coastline.length >= 3) {
+            const coastScreen = continent.coastline.map((p) => w2sFn(p.x, p.y));
+            ctx.save();
+            ctx.beginPath();
+            ctx.moveTo(coastScreen[0].x, coastScreen[0].y);
+            for (let ci = 1; ci < coastScreen.length; ci++) {
+              ctx.lineTo(coastScreen[ci].x, coastScreen[ci].y);
+            }
+            ctx.closePath();
+            ctx.clip();
+            for (const zone of memberZones) {
+              if (!zone.cellPolygons || zone.cellPolygons.length === 0)
+                continue;
+              if (subAlpha > 0.01 && zone.subDomainCells && zone.subDomainCells.size > 1) {
+                const subIds = [...zone.subDomainCells.keys()].sort((a, b) => a - b);
+                for (let si = 0; si < subIds.length; si++) {
+                  const t = subIds.length > 1 ? si / (subIds.length - 1) : 0;
+                  const targetShade = t < 0.5 ? lerpColor(zone.color, "#000000", t * 0.8) : lerpColor(zone.color, "#FFFFFF", (t - 0.5) * 1);
+                  const shade = lerpColor(zone.color, targetShade, subAlpha);
+                  const rgb = hexToRgb(shade);
+                  const parentAlpha = 0.12 * globalZoneAlpha * parentFillFade;
+                  const subFillAlpha = 0.22 * globalZoneAlpha * subAlpha;
+                  const blendedAlpha = parentAlpha + subFillAlpha;
+                  ctx.fillStyle = `rgba(${rgb.join(",")},${blendedAlpha})`;
+                  for (const cell of zone.subDomainCells.get(subIds[si])) {
+                    if (cell.length < 3)
+                      continue;
+                    ctx.beginPath();
+                    const s0 = w2sFn(cell[0].x, cell[0].y);
+                    ctx.moveTo(s0.x, s0.y);
+                    for (let vi = 1; vi < cell.length; vi++) {
+                      const sv = w2sFn(cell[vi].x, cell[vi].y);
+                      ctx.lineTo(sv.x, sv.y);
+                    }
+                    ctx.closePath();
+                    ctx.fill();
+                  }
+                }
+              } else {
+                const fillAlpha = 0.12 * globalZoneAlpha;
+                ctx.fillStyle = `rgba(${hexToRgb(zone.color).join(",")},${fillAlpha})`;
+                for (const cell of zone.cellPolygons) {
+                  if (cell.length < 3)
+                    continue;
+                  ctx.beginPath();
+                  const s0 = w2sFn(cell[0].x, cell[0].y);
+                  ctx.moveTo(s0.x, s0.y);
+                  for (let vi = 1; vi < cell.length; vi++) {
+                    const sv = w2sFn(cell[vi].x, cell[vi].y);
+                    ctx.lineTo(sv.x, sv.y);
+                  }
+                  ctx.closePath();
+                  ctx.fill();
+                }
+              }
+            }
+            const provinceAlpha = 0.2;
+            const continentZoneSet = new Set(continent.zoneIds);
+            if (provinceAlpha > 0.01) {
+              const provColor = isDarkTheme ? `rgba(200,220,255,${provinceAlpha})` : `rgba(40,60,100,${provinceAlpha})`;
+              ctx.setLineDash([3, 4]);
+              ctx.strokeStyle = provColor;
+              ctx.lineWidth = 0.8;
+              for (const edge of this.borderEdges) {
+                if (edge.edgeType !== "province")
+                  continue;
+                if (!continentZoneSet.has(edge.leftZone) && !continentZoneSet.has(edge.rightZone))
+                  continue;
+                const edgeScreen = edge.vertices.map((p) => w2sFn(p.x, p.y));
+                if (edgeScreen.length < 2)
+                  continue;
+                ctx.beginPath();
+                ctx.moveTo(edgeScreen[0].x, edgeScreen[0].y);
+                for (let ei = 1; ei < edgeScreen.length; ei++)
+                  ctx.lineTo(edgeScreen[ei].x, edgeScreen[ei].y);
+                ctx.stroke();
+              }
+              ctx.setLineDash([]);
+            }
+            const borderColor = isDarkTheme ? "rgba(200,220,255,0.2)" : "rgba(40,60,100,0.2)";
+            ctx.strokeStyle = borderColor;
+            ctx.lineWidth = 1;
+            for (const edge of this.borderEdges) {
+              if (edge.edgeType !== "border")
+                continue;
+              if (!continentZoneSet.has(edge.leftZone) && !continentZoneSet.has(edge.rightZone))
+                continue;
+              const edgeScreen = edge.vertices.map((p) => w2sFn(p.x, p.y));
+              if (edgeScreen.length < 2)
+                continue;
+              ctx.beginPath();
+              ctx.moveTo(edgeScreen[0].x, edgeScreen[0].y);
+              for (let ei = 1; ei < edgeScreen.length; ei++)
+                ctx.lineTo(edgeScreen[ei].x, edgeScreen[ei].y);
+              ctx.stroke();
+            }
+            ctx.restore();
+            ctx.save();
+            ctx.beginPath();
+            ctx.moveTo(coastScreen[0].x, coastScreen[0].y);
+            for (let ci = 1; ci < coastScreen.length; ci++) {
+              ctx.lineTo(coastScreen[ci].x, coastScreen[ci].y);
+            }
+            ctx.closePath();
+            const coastColor = isDarkTheme ? "rgba(200,220,255,0.35)" : "rgba(40,60,100,0.35)";
+            ctx.shadowColor = coastColor;
+            ctx.shadowBlur = 10;
+            ctx.strokeStyle = coastColor;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+            ctx.restore();
+          } else {
+            for (const zone of memberZones) {
+              if (zone.cellPolygons) {
+                const fillAlpha = 0.12 * globalZoneAlpha;
+                ctx.fillStyle = `rgba(${hexToRgb(zone.color).join(",")},${fillAlpha})`;
+                for (const cell of zone.cellPolygons) {
+                  if (cell.length < 3)
+                    continue;
+                  ctx.beginPath();
+                  const s0 = w2sFn(cell[0].x, cell[0].y);
+                  ctx.moveTo(s0.x, s0.y);
+                  for (let vi = 1; vi < cell.length; vi++) {
+                    const sv = w2sFn(cell[vi].x, cell[vi].y);
+                    ctx.lineTo(sv.x, sv.y);
+                  }
+                  ctx.closePath();
+                  ctx.fill();
+                }
+              }
+            }
           }
         }
-        for (const zone of this.localZones) {
-          drawZone(ctx, zone, w2sFn, 1, true);
-        }
-      } else if (this.zones.length > 0) {
         for (const zone of this.zones) {
-          drawZone(ctx, zone, w2sFn, 1);
+          if (!zone.cellPolygons || zone.cellPolygons.length === 0)
+            continue;
+          let cx = 0, cy = 0, count = 0;
+          for (const cell of zone.cellPolygons) {
+            for (const v of cell) {
+              cx += v.x;
+              cy += v.y;
+              count++;
+            }
+          }
+          if (count === 0)
+            continue;
+          cx /= count;
+          cy /= count;
+          const spt = w2sFn(cx, cy);
+          ctx.save();
+          ctx.font = "600 9px var(--font-interface)";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.letterSpacing = "1.5px";
+          ctx.fillStyle = `rgba(${hexToRgb(zone.color).join(",")},${0.5 * globalZoneAlpha})`;
+          ctx.fillText(zone.label.toUpperCase(), spt.x, spt.y);
+          ctx.letterSpacing = "0px";
+          ctx.restore();
+        }
+        if (subAlpha > 0.01) {
+          for (const zone of this.zones) {
+            if (!zone.subDomainCells || zone.subDomainCells.size <= 1)
+              continue;
+            const subZones = this.subZonesMap.get(zone.id);
+            if (!subZones)
+              continue;
+            const subIds = [...zone.subDomainCells.keys()].sort((a, b) => a - b);
+            for (let si = 0; si < subIds.length; si++) {
+              const cells = zone.subDomainCells.get(subIds[si]);
+              if (!cells || cells.length === 0)
+                continue;
+              const sz = subZones[si];
+              if (!sz)
+                continue;
+              let cx = 0, cy = 0, count = 0;
+              for (const cell of cells) {
+                for (const v of cell) {
+                  cx += v.x;
+                  cy += v.y;
+                  count++;
+                }
+              }
+              if (count === 0)
+                continue;
+              cx /= count;
+              cy /= count;
+              const spt = w2sFn(cx, cy);
+              ctx.save();
+              ctx.font = "7px var(--font-interface)";
+              ctx.textAlign = "center";
+              ctx.textBaseline = "middle";
+              ctx.fillStyle = `rgba(${hexToRgb(zone.color).join(",")},${0.4 * subAlpha})`;
+              ctx.translate(spt.x, spt.y);
+              ctx.transform(1, 0, -0.21, 1, 0, 0);
+              ctx.fillText(sz.label, 0, 0);
+              ctx.restore();
+            }
+          }
+        }
+        const continentLabelAlpha = Math.max(0, 1 - (zoom - 1) / 2);
+        if (continentLabelAlpha > 0.01) {
+          for (const continent of this.continents) {
+            if (continent.zoneIds.length <= 1)
+              continue;
+            const memberZones = continent.zoneIds.map((id) => zoneById.get(id)).filter((z) => !!z);
+            if (memberZones.length <= 1)
+              continue;
+            let cx = 0, cy = 0;
+            for (const z of memberZones) {
+              const blobCx = z.blob.reduce((s, p) => s + p.x, 0) / z.blob.length;
+              const blobCy = z.blob.reduce((s, p) => s + p.y, 0) / z.blob.length;
+              cx += blobCx;
+              cy += blobCy;
+            }
+            cx /= memberZones.length;
+            cy /= memberZones.length;
+            const spt = w2sFn(cx, cy);
+            ctx.save();
+            ctx.globalAlpha = continentLabelAlpha;
+            ctx.font = "bold 14px var(--font-interface)";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.letterSpacing = "3px";
+            ctx.fillStyle = isDarkTheme ? "rgba(200,220,255,0.4)" : "rgba(40,60,100,0.4)";
+            ctx.fillText(continent.label.toUpperCase(), spt.x, spt.y - 20);
+            ctx.letterSpacing = "0px";
+            ctx.restore();
+          }
+        }
+      } else {
+        for (const zone of this.zones) {
+          drawZone(ctx, zone, w2sFn, globalZoneAlpha, false, isWorldmap, false, void 0, parentFillFade);
+        }
+        if (subAlpha > 0.01) {
+          for (const zone of this.zones) {
+            const subZones = this.subZonesMap.get(zone.id);
+            if (!subZones)
+              continue;
+            const shades = subZones.map((_, i) => {
+              const t = subZones.length > 1 ? i / (subZones.length - 1) : 0;
+              return lerpColor(zone.color, "#FFFFFF", 0.15 + t * 0.35);
+            });
+            for (let si = 0; si < subZones.length; si++) {
+              drawZone(ctx, subZones[si], w2sFn, subAlpha, true, false, false, shades[si]);
+            }
+          }
         }
       }
     }
     if (showLinks) {
       ctx.save();
-      ctx.strokeStyle = isLocal ? th.linkStrokeLocal : th.linkStroke;
-      ctx.lineWidth = isLocal ? 0.8 : 1;
+      ctx.strokeStyle = th.linkStroke;
+      ctx.lineWidth = 1;
       for (let i = 0; i < pts.length; i++) {
         for (const link of pts[i].links) {
           const j = idx.get(link);
@@ -9315,7 +11026,7 @@ var ChorographiaView = class extends import_obsidian7.ItemView {
       }
       ctx.restore();
     }
-    const baseR = isLocal ? Math.max(5, 4 * this.zoom) : Math.max(2.5, 2.5 * this.zoom);
+    const baseR = Math.max(1.5, 1.5 * zoom);
     for (let i = 0; i < pts.length; i++) {
       const s = scr[i];
       if (s.x < -80 || s.x > W + 80 || s.y < -80 || s.y > H + 80)
@@ -9324,7 +11035,7 @@ var ChorographiaView = class extends import_obsidian7.ItemView {
       const hov = i === this.hoverIdx;
       const r = sel ? baseR * 1.4 : baseR;
       const alpha = hov || sel ? 1 : 0.78;
-      if (isLocal || this.zoom > 2) {
+      if (zoom > 2) {
         const glowR = r * 2.5;
         const grad = ctx.createRadialGradient(s.x, s.y, r * 0.3, s.x, s.y, glowR);
         const c = this.color(pts[i]);
@@ -9355,25 +11066,20 @@ var ChorographiaView = class extends import_obsidian7.ItemView {
       ctx.lineWidth = 1.5;
       ctx.stroke();
     }
-    if (isLocal) {
-      this.drawLocalLabels(ctx, pts, scr, baseR);
-    } else {
-      const alpha = Math.min(1, Math.max(0, (this.zoom - 3) / 3));
-      if (alpha > 0.01)
-        this.drawGlobalLabels(ctx, pts, scr, alpha, W, H);
-    }
-    if (isLocal) {
+    const labelAlpha = Math.min(1, Math.max(0, (zoom - 5) / 3));
+    if (labelAlpha > 0.01 && this.plugin.settings.showNoteTitles)
+      this.drawGlobalLabels(ctx, pts, scr, labelAlpha, W, H);
+    if (zoom > 1.2 && this.plugin.settings.minimapCorner !== "off") {
       this.drawMinimap(ctx, W, H);
     }
-    const globalAlpha = Math.min(1, Math.max(0, (this.zoom - 3) / 3));
-    if (this.hoverIdx >= 0 && !isLocal && globalAlpha < 0.5) {
+    if (this.hoverIdx >= 0 && labelAlpha < 0.5) {
       this.drawTooltip(ctx, scr[this.hoverIdx], pts[this.hoverIdx].title);
     }
   }
   // ---------- semantic point ----------
   drawSemPt(ctx, sx, sy, r, p, a) {
-    const cA = SEM_PALETTE2[p.semA % SEM_PALETTE2.length];
-    const cB = SEM_PALETTE2[p.semB % SEM_PALETTE2.length];
+    const cA = SEM_PALETTE3[p.semA % SEM_PALETTE3.length];
+    const cB = SEM_PALETTE3[p.semB % SEM_PALETTE3.length];
     const split = SEM_SPLIT[p.semW] ?? 0.5;
     const grad = ctx.createConicGradient(0, sx, sy);
     grad.addColorStop(0, cA);
@@ -9392,74 +11098,10 @@ var ChorographiaView = class extends import_obsidian7.ItemView {
     ctx.fill();
   }
   // ---------- labels ----------
-  drawLocalLabels(ctx, pts, scr, baseR) {
-    const th = this.theme;
-    const comX = scr.reduce((s, p) => s + p.x, 0) / scr.length;
-    const comY = scr.reduce((s, p) => s + p.y, 0) / scr.length;
-    const fontSize = 11;
-    ctx.font = `${fontSize}px var(--font-interface)`;
-    const placed = [];
-    for (let i = 0; i < pts.length; i++) {
-      const s = scr[i];
-      const label = pts[i].title.length > 45 ? pts[i].title.slice(0, 42) + "..." : pts[i].title;
-      const tw = ctx.measureText(label).width;
-      const pad = 4;
-      const bw = tw + pad * 2;
-      const bh = fontSize + pad * 2;
-      const offset = baseR + 6;
-      const angle = Math.atan2(s.y - comY, s.x - comX);
-      let bestX = 0, bestY = 0, bestOverlap = Infinity;
-      for (const flip of [0, Math.PI, Math.PI / 2, -Math.PI / 2]) {
-        const a = angle + flip;
-        let tx = s.x + Math.cos(a) * offset;
-        let ty = s.y + Math.sin(a) * offset;
-        if (Math.cos(a) < -0.3)
-          tx -= bw;
-        else if (Math.cos(a) < 0.3)
-          tx -= bw / 2;
-        ty -= bh / 2;
-        let overlap = 0;
-        for (const r of placed) {
-          const ox = Math.max(0, Math.min(tx + bw, r.x + r.w) - Math.max(tx, r.x));
-          const oy = Math.max(0, Math.min(ty + bh, r.y + r.h) - Math.max(ty, r.y));
-          overlap += ox * oy;
-        }
-        if (overlap < bestOverlap) {
-          bestOverlap = overlap;
-          bestX = tx;
-          bestY = ty;
-          if (overlap === 0)
-            break;
-        }
-      }
-      placed.push({ x: bestX, y: bestY, w: bw, h: bh });
-      const isSel = i === this.selectedIdx;
-      ctx.fillStyle = isSel ? "rgba(201,150,59,0.18)" : th.labelPillBg;
-      ctx.beginPath();
-      ctx.roundRect(bestX, bestY, bw, bh, 4);
-      ctx.fill();
-      if (isSel) {
-        ctx.strokeStyle = "rgba(201,150,59,0.4)";
-        ctx.lineWidth = 1;
-        ctx.stroke();
-      }
-      ctx.fillStyle = isSel ? "#C9963B" : th.text;
-      ctx.globalAlpha = isSel ? 1 : 0.88;
-      ctx.textAlign = "left";
-      ctx.fillText(label, bestX + pad, bestY + fontSize + pad - 2);
-      ctx.globalAlpha = 1;
-      ctx.strokeStyle = th.connectorLine;
-      ctx.lineWidth = 0.5;
-      ctx.beginPath();
-      ctx.moveTo(s.x, s.y);
-      ctx.lineTo(bestX + bw / 2, bestY + bh / 2);
-      ctx.stroke();
-    }
-  }
   drawGlobalLabels(ctx, pts, scr, alpha, W, H) {
     ctx.save();
     ctx.globalAlpha = alpha;
-    ctx.font = "9px var(--font-interface)";
+    ctx.font = "5px var(--font-interface)";
     ctx.fillStyle = this.theme.text;
     ctx.textAlign = "left";
     for (let i = 0; i < pts.length; i++) {
@@ -9467,7 +11109,7 @@ var ChorographiaView = class extends import_obsidian7.ItemView {
       if (s.x < -50 || s.x > W + 50 || s.y < -50 || s.y > H + 50)
         continue;
       const t = pts[i].title.length > 40 ? pts[i].title.slice(0, 37) + "..." : pts[i].title;
-      ctx.fillText(t, s.x + 6, s.y + 3);
+      ctx.fillText(t, s.x + 4, s.y + 2);
     }
     ctx.restore();
   }
@@ -9490,25 +11132,15 @@ var ChorographiaView = class extends import_obsidian7.ItemView {
     ctx.textAlign = "left";
     ctx.fillText(label, tx, ty);
   }
-  updateSwitchLabels() {
-    const labels = this.viewSwitchEl.querySelectorAll(".switch-label");
-    if (this.viewMode === "local") {
-      labels[0]?.classList.remove("is-active");
-      labels[1]?.classList.add("is-active");
-    } else {
-      labels[0]?.classList.add("is-active");
-      labels[1]?.classList.remove("is-active");
-    }
-  }
   // ===================== active note sync =====================
   syncActiveNoteSelection() {
     const file = this.app.workspace.getActiveFile();
     if (!file)
       return;
     const idx = this.points.findIndex((p) => p.path === file.path);
-    if (idx >= 0 && idx !== this.selectedIdx) {
+    if (idx >= 0) {
       this.selectedIdx = idx;
-      this.draw();
+      this.animateTo(this.points[idx].x, this.points[idx].y);
     }
   }
   // ===================== minimap =====================
@@ -9559,37 +11191,103 @@ var ChorographiaView = class extends import_obsidian7.ItemView {
     const scale = inner / Math.max(rangeX, rangeY);
     const cxOff = ox + margin + (inner - rangeX * scale) / 2;
     const cyOff = oy + margin + (inner - rangeY * scale) / 2;
-    const localPaths = new Set(this.points.map((p) => p.path));
+    if (this.plugin.settings.showZones && this.zones.length > 0) {
+      const w2m = (wx, wy) => ({
+        x: cxOff + (wx - minX) * scale,
+        y: cyOff + (maxY - wy) * scale
+      });
+      const isWorldmap = this.plugin.settings.zoneStyle === "worldmap";
+      const isDark = document.body.classList.contains("theme-dark");
+      const borderCol = isDark ? "rgba(200,220,255,0.3)" : "rgba(40,60,100,0.3)";
+      ctx.strokeStyle = borderCol;
+      ctx.lineWidth = 0.8;
+      ctx.globalAlpha = 1;
+      if (isWorldmap && this.continents.length > 0) {
+        for (const cont of this.continents) {
+          if (!cont.coastline || cont.coastline.length < 3)
+            continue;
+          ctx.beginPath();
+          const s0 = w2m(cont.coastline[0].x, cont.coastline[0].y);
+          ctx.moveTo(s0.x, s0.y);
+          for (let i = 1; i < cont.coastline.length; i++) {
+            const sp = w2m(cont.coastline[i].x, cont.coastline[i].y);
+            ctx.lineTo(sp.x, sp.y);
+          }
+          ctx.closePath();
+          ctx.stroke();
+        }
+        for (const edge of this.borderEdges) {
+          if (edge.edgeType !== "border")
+            continue;
+          if (edge.vertices.length < 2)
+            continue;
+          ctx.beginPath();
+          const s0 = w2m(edge.vertices[0].x, edge.vertices[0].y);
+          ctx.moveTo(s0.x, s0.y);
+          for (let i = 1; i < edge.vertices.length; i++) {
+            const sp = w2m(edge.vertices[i].x, edge.vertices[i].y);
+            ctx.lineTo(sp.x, sp.y);
+          }
+          ctx.stroke();
+        }
+      } else {
+        for (const zone of this.zones) {
+          if (zone.blob.length < 3)
+            continue;
+          ctx.beginPath();
+          const s0 = w2m(zone.blob[0].x, zone.blob[0].y);
+          ctx.moveTo(s0.x, s0.y);
+          for (let i = 1; i < zone.blob.length; i++) {
+            const sp = w2m(zone.blob[i].x, zone.blob[i].y);
+            ctx.lineTo(sp.x, sp.y);
+          }
+          ctx.closePath();
+          ctx.stroke();
+        }
+      }
+    }
     for (const p of all) {
       const sx = cxOff + (p.x - minX) * scale;
       const sy = cyOff + (maxY - p.y) * scale;
-      const inLocal = localPaths.has(p.path);
       ctx.beginPath();
-      ctx.arc(sx, sy, inLocal ? 3 : 1.5, 0, Math.PI * 2);
-      ctx.fillStyle = inLocal ? this.color(p) : th.minimapDimPoint;
-      ctx.globalAlpha = inLocal ? 1 : 0.7;
+      ctx.arc(sx, sy, 1.5, 0, Math.PI * 2);
+      ctx.fillStyle = this.color(p);
+      ctx.globalAlpha = 0.7;
       ctx.fill();
     }
     if (this.selectedIdx >= 0) {
       const sp = this.points[this.selectedIdx];
-      const orig = all.find((p) => p.path === sp.path);
-      if (orig) {
-        const sx = cxOff + (orig.x - minX) * scale;
-        const sy = cyOff + (maxY - orig.y) * scale;
-        ctx.beginPath();
-        ctx.arc(sx, sy, 4, 0, Math.PI * 2);
-        ctx.strokeStyle = "#C9963B";
-        ctx.lineWidth = 1.5;
-        ctx.globalAlpha = 1;
-        ctx.stroke();
-      }
+      const sx = cxOff + (sp.x - minX) * scale;
+      const sy = cyOff + (maxY - sp.y) * scale;
+      ctx.beginPath();
+      ctx.arc(sx, sy, 4, 0, Math.PI * 2);
+      ctx.strokeStyle = "#C9963B";
+      ctx.lineWidth = 1.5;
+      ctx.globalAlpha = 1;
+      ctx.stroke();
     }
+    const topLeft = this.s2w(0, 0);
+    const bottomRight = this.s2w(W, H);
+    const vx1 = cxOff + (topLeft.x - minX) * scale;
+    const vy1 = cyOff + (maxY - topLeft.y) * scale;
+    const vx2 = cxOff + (bottomRight.x - minX) * scale;
+    const vy2 = cyOff + (maxY - bottomRight.y) * scale;
+    ctx.strokeStyle = th.text;
+    ctx.globalAlpha = 0.4;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(
+      Math.min(vx1, vx2),
+      Math.min(vy1, vy2),
+      Math.abs(vx2 - vx1),
+      Math.abs(vy2 - vy1)
+    );
     ctx.restore();
   }
   // ===================== interactions =====================
   setupInteractions() {
     const c = this.canvas;
     c.addEventListener("mousedown", (e) => {
+      this.cancelAnimation();
       this.dragging = true;
       this.dragStartX = e.clientX;
       this.dragStartY = e.clientY;
@@ -9639,6 +11337,7 @@ var ChorographiaView = class extends import_obsidian7.ItemView {
     });
     c.addEventListener("wheel", (e) => {
       e.preventDefault();
+      this.cancelAnimation();
       const rect = c.getBoundingClientRect();
       const mx = e.clientX - rect.left, my = e.clientY - rect.top;
       const before = this.s2w(mx, my);
@@ -9655,6 +11354,7 @@ var ChorographiaView = class extends import_obsidian7.ItemView {
     let lastTouchMidY = 0;
     c.addEventListener("touchstart", (e) => {
       e.preventDefault();
+      this.cancelAnimation();
       if (e.touches.length === 1) {
         const t = e.touches[0];
         this.dragging = true;
@@ -9726,12 +11426,8 @@ var ChorographiaView = class extends import_obsidian7.ItemView {
   handleClick() {
     const i = this.hoverIdx;
     if (i < 0) {
-      if (this.viewMode === "local")
-        this.enterGlobalView();
-      else {
-        this.selectedIdx = -1;
-        this.draw();
-      }
+      this.selectedIdx = -1;
+      this.draw();
       return;
     }
     this.selectedIdx = i;
@@ -9739,32 +11435,22 @@ var ChorographiaView = class extends import_obsidian7.ItemView {
     const leaves = this.app.workspace.getLeavesOfType("markdown");
     const targetLeaf = leaves.length > 0 ? leaves[0] : this.app.workspace.getLeaf("tab");
     targetLeaf.openFile(this.app.vault.getFileByPath(p.path));
-    if (this.viewMode === "local") {
-      this.enterLocalView(p.path);
-    } else {
-      this.draw();
-    }
+    this.animateTo(p.x, p.y);
   }
   updateStatus() {
-    const n = this.points.length, t = this.allPoints.length;
+    const t = this.allPoints.length;
     const z = this.zoom.toFixed(1);
-    this.statusEl.textContent = this.viewMode === "local" ? `local: ${n}/${t} notes | zoom ${z}x` : `${t} notes | zoom ${z}x`;
+    this.statusEl.textContent = `${t} notes | zoom ${z}x`;
   }
   async refresh() {
-    const wasLocal = this.viewMode === "local";
-    const wasPath = this.localCenterPath;
     await this.loadPoints();
-    if (wasLocal && wasPath) {
-      this.enterLocalView(wasPath);
-    } else {
-      this.resizeCanvas();
-      this.draw();
-    }
+    this.resizeCanvas();
+    this.draw();
   }
 };
 
 // src/main.ts
-var SEM_PALETTE3 = [
+var SEM_PALETTE4 = [
   "#00D6FF",
   "#B9FF00",
   "#FF7A00",
@@ -9810,15 +11496,15 @@ function noteColor(note, folderColors) {
   const semB = note.semB ?? -1;
   const semW = note.semW ?? 3;
   if (semA >= 0) {
-    const cA = SEM_PALETTE3[semA % SEM_PALETTE3.length];
+    const cA = SEM_PALETTE4[semA % SEM_PALETTE4.length];
     if (semB < 0 || semA === semB)
       return cA;
-    const cB = SEM_PALETTE3[semB % SEM_PALETTE3.length];
+    const cB = SEM_PALETTE4[semB % SEM_PALETTE4.length];
     return lerpHex(cA, cB, 1 - (SEM_SPLIT2[semW] ?? 0.5));
   }
   return folderColors.get(note.folder) || FOLDER_COLORS2[0];
 }
-var ChorographiaPlugin = class extends import_obsidian8.Plugin {
+var ChorographiaPlugin = class extends import_obsidian7.Plugin {
   constructor() {
     super(...arguments);
     this.settings = DEFAULT_SETTINGS;
@@ -9845,11 +11531,6 @@ var ChorographiaPlugin = class extends import_obsidian8.Plugin {
       id: "re-embed-changed",
       name: "Re-embed changed notes",
       callback: () => this.runEmbedPipeline()
-    });
-    this.addCommand({
-      id: "recompute-layout",
-      name: "Recompute layout",
-      callback: () => this.runLayoutCompute()
     });
     this.addSettingTab(new ChorographiaSettingTab(this.app, this));
     this.app.workspace.onLayoutReady(() => {
@@ -9904,29 +11585,27 @@ var ChorographiaPlugin = class extends import_obsidian8.Plugin {
         return `openai:${this.settings.embeddingModel}`;
       case "openrouter":
         return `openrouter:${this.settings.openrouterEmbedModel}`;
-      case "smart-connections":
-        return "smart-connections";
     }
   }
   async runEmbedPipeline() {
     if (this.settings.embeddingProvider === "openai" && !this.settings.openaiApiKey) {
-      new import_obsidian8.Notice("Chorographia: Set your OpenAI API key in settings first.");
+      new import_obsidian7.Notice("Chorographia: Set your OpenAI API key in settings first.");
       return;
     }
     if (this.settings.embeddingProvider === "openrouter" && !this.settings.openrouterApiKey) {
-      new import_obsidian8.Notice("Chorographia: Set your OpenRouter API key in settings first.");
+      new import_obsidian7.Notice("Chorographia: Set your OpenRouter API key in settings first.");
       return;
     }
     const globs = this.settings.includeGlobs.split(",").map((g) => g.trim()).filter(Boolean);
     const excludeGlobs = this.settings.excludeGlobs.split(",").map((g) => g.trim()).filter(Boolean);
-    new import_obsidian8.Notice("Chorographia: Indexing vault...");
+    new import_obsidian7.Notice("Chorographia: Indexing vault...");
     const notes = await indexVault(
       this.app.vault,
       globs,
       excludeGlobs,
       this.settings.maxNotes
     );
-    new import_obsidian8.Notice(`Chorographia: Found ${notes.length} notes.`);
+    new import_obsidian7.Notice(`Chorographia: Found ${notes.length} notes.`);
     const modelStr = this.embeddingModelString;
     const toEmbed = [];
     for (const note of notes) {
@@ -9948,17 +11627,17 @@ var ChorographiaPlugin = class extends import_obsidian8.Plugin {
       }
     }
     if (toEmbed.length === 0) {
-      new import_obsidian8.Notice("Chorographia: All notes up to date.");
+      new import_obsidian7.Notice("Chorographia: All notes up to date.");
       await this.saveCache();
       this.refreshMapViews();
       this.updateExplorerDots();
       return;
     }
-    new import_obsidian8.Notice(
+    new import_obsidian7.Notice(
       `Chorographia: Embedding ${toEmbed.length} notes...`
     );
     const onProgress = (done, total) => {
-      new import_obsidian8.Notice(`Chorographia: Embedded ${done}/${total}`);
+      new import_obsidian7.Notice(`Chorographia: Embedded ${done}/${total}`);
     };
     let results;
     switch (this.settings.embeddingProvider) {
@@ -9970,9 +11649,6 @@ var ChorographiaPlugin = class extends import_obsidian8.Plugin {
         break;
       case "openrouter":
         results = await embedTextsOpenRouter(toEmbed, this.settings.openrouterApiKey, this.settings.openrouterEmbedModel, onProgress);
-        break;
-      case "smart-connections":
-        results = await importSmartConnectionsEmbeddings(this.app, toEmbed.map((t) => t.path));
         break;
     }
     for (const r of results) {
@@ -9999,20 +11675,33 @@ var ChorographiaPlugin = class extends import_obsidian8.Plugin {
         this.cache.notes[note.path].links = note.links;
       }
     }
-    this.cache.zones = {};
-    await this.computeSemanticColors();
+    if (this.settings.mapLocked) {
+      this.preserveAndInvalidateZones();
+    } else {
+      this.cache.zones = {};
+    }
+    if (this.settings.mapLocked) {
+      this.computeSemanticColorsLocked();
+    } else {
+      await this.computeSemanticColors();
+    }
     await this.saveCache();
     this.refreshMapViews();
     this.updateExplorerDots();
-    new import_obsidian8.Notice(`Chorographia: Embedding complete (${results.length} new).`);
+    new import_obsidian7.Notice(`Chorographia: Embedding complete (${results.length} new).`);
     const hasLayout = Object.values(this.cache.notes).some(
       (n) => n.x != null
     );
-    if (!hasLayout) {
+    const hasNewWithoutCoords = this.settings.mapLocked && Object.values(this.cache.notes).some((n) => n.embedding && n.x == null);
+    if (!hasLayout || hasNewWithoutCoords) {
       await this.runLayoutCompute();
     }
   }
   async runZoneNaming() {
+    if (this.settings.mapLocked) {
+      delete this.cache.lockedLabels;
+      delete this.cache.lockedSubLabels;
+    }
     this.cache.zones = {};
     await this.saveCache();
     await this.refreshMapViews();
@@ -10077,26 +11766,44 @@ var ChorographiaPlugin = class extends import_obsidian8.Plugin {
       (n) => n.embedding
     ).length;
     if (count === 0) {
-      new import_obsidian8.Notice("Chorographia: No embeddings cached. Run re-embed first.");
+      new import_obsidian7.Notice("Chorographia: No embeddings cached. Run re-embed first.");
       return;
     }
-    new import_obsidian8.Notice(`Chorographia: Computing layout for ${count} notes...`);
-    await new Promise((resolve) => {
-      setTimeout(() => {
-        const points = computeLayout(this.cache.notes);
+    if (this.settings.mapLocked) {
+      const newPaths = Object.entries(this.cache.notes).filter(([_, n]) => n.embedding && n.x == null).map(([p]) => p);
+      if (newPaths.length === 0) {
+        new import_obsidian7.Notice("Chorographia: All notes already placed.");
+      } else {
+        new import_obsidian7.Notice(`Chorographia: Placing ${newPaths.length} new notes...`);
+        const points = interpolateNewPoints(this.cache.notes, newPaths);
         for (const p of points) {
           if (this.cache.notes[p.path]) {
             this.cache.notes[p.path].x = p.x;
             this.cache.notes[p.path].y = p.y;
           }
         }
-        resolve();
-      }, 50);
-    });
-    this.cache.zones = {};
-    await this.computeSemanticColors();
+      }
+      this.computeSemanticColorsLocked();
+      this.preserveAndInvalidateZones();
+    } else {
+      new import_obsidian7.Notice(`Chorographia: Computing layout for ${count} notes...`);
+      await new Promise((resolve) => {
+        setTimeout(() => {
+          const points = computeLayout(this.cache.notes);
+          for (const p of points) {
+            if (this.cache.notes[p.path]) {
+              this.cache.notes[p.path].x = p.x;
+              this.cache.notes[p.path].y = p.y;
+            }
+          }
+          resolve();
+        }, 50);
+      });
+      this.cache.zones = {};
+      await this.computeSemanticColors();
+    }
     await this.saveCache();
-    new import_obsidian8.Notice("Chorographia: Layout computed.");
+    new import_obsidian7.Notice("Chorographia: Layout computed.");
     for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE)) {
       leaf.view.refresh();
     }
@@ -10124,5 +11831,62 @@ var ChorographiaPlugin = class extends import_obsidian8.Plugin {
         note.semW = assignments[i].semW;
       }
     }
+  }
+  /**
+   * Assign semantic colors using cached locked centroids instead of re-running k-means.
+   * Falls back to full computeSemanticColors if no locked centroids exist.
+   */
+  computeSemanticColorsLocked() {
+    let centroids;
+    if (this.cache.lockedCentroids && this.cache.lockedCentroids.length > 0) {
+      centroids = this.cache.lockedCentroids.map((c) => decodeFloat32(c));
+    } else if (this.cache.zones) {
+      for (const entry of Object.values(this.cache.zones)) {
+        if (entry.centroids && entry.centroids.length > 0) {
+          centroids = entry.centroids.map((c) => decodeFloat32(c));
+          break;
+        }
+      }
+    }
+    if (!centroids) {
+      this.computeSemanticColors();
+      return;
+    }
+    const paths = [];
+    const vectors = [];
+    for (const [path, note] of Object.entries(this.cache.notes)) {
+      if (note.embedding) {
+        paths.push(path);
+        vectors.push(decodeFloat32(note.embedding));
+      }
+    }
+    if (vectors.length === 0)
+      return;
+    const assignments = computeSemanticAssignments(vectors, centroids);
+    for (let i = 0; i < paths.length; i++) {
+      const note = this.cache.notes[paths[i]];
+      if (note) {
+        note.semA = assignments[i].semA;
+        note.semB = assignments[i].semB;
+        note.semW = assignments[i].semW;
+      }
+    }
+  }
+  /**
+   * Extract labels + centroids from the most recent zone cache entry,
+   * store them in the locked* fields, then wipe zone geometry cache.
+   */
+  preserveAndInvalidateZones() {
+    if (this.cache.zones) {
+      for (const entry of Object.values(this.cache.zones)) {
+        if (entry.centroids && entry.centroids.length > 0) {
+          this.cache.lockedCentroids = entry.centroids;
+          this.cache.lockedLabels = entry.labels;
+          this.cache.lockedSubLabels = entry.subLabels;
+          break;
+        }
+      }
+    }
+    this.cache.zones = {};
   }
 };

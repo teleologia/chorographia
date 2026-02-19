@@ -38,23 +38,66 @@
 	font-family: var(--font-monospace);
 }
 
-.chorographia-controls {
+/* ========== Pullout menu ========== */
+
+.chorographia-menu-btn {
 	position: absolute;
 	top: 12px;
 	right: 12px;
+	width: 32px;
+	height: 32px;
 	display: flex;
 	align-items: center;
-	padding: 4px 10px;
-	font-size: 11px;
+	justify-content: center;
+	padding: 0;
 	color: #D6D6E0;
 	background: rgba(15, 15, 26, 0.85);
 	border: 1px solid rgba(44, 44, 58, 0.6);
 	border-radius: 6px;
-	font-family: var(--font-interface);
-	z-index: 10;
+	cursor: pointer;
+	z-index: 11;
+	transition: background 0.15s;
 }
 
-.chorographia-controls select {
+.chorographia-menu-btn:hover {
+	background: rgba(30, 30, 50, 0.95);
+}
+
+.chorographia-menu-btn svg {
+	width: 16px;
+	height: 16px;
+}
+
+.chorographia-menu {
+	position: absolute;
+	top: 50px;
+	right: 12px;
+	display: none;
+	flex-direction: column;
+	gap: 6px;
+	padding: 8px 12px;
+	font-size: 11px;
+	color: #D6D6E0;
+	background: rgba(15, 15, 26, 0.92);
+	border: 1px solid rgba(44, 44, 58, 0.6);
+	border-radius: 6px;
+	font-family: var(--font-interface);
+	z-index: 10;
+	min-width: 140px;
+}
+
+.chorographia-menu.is-open {
+	display: flex;
+}
+
+.chorographia-menu-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+}
+
+.chorographia-menu select {
 	background: rgba(26, 26, 46, 0.9);
 	color: #D6D6E0;
 	border: 1px solid rgba(44, 44, 58, 0.8);
@@ -63,14 +106,6 @@
 	font-size: 11px;
 	font-family: var(--font-interface);
 	cursor: pointer;
-}
-
-.chorographia-sep {
-	display: inline-block;
-	width: 1px;
-	height: 14px;
-	background: rgba(142, 154, 175, 0.25);
-	margin: 0 8px;
 }
 
 .chorographia-toggle-label {
@@ -88,68 +123,6 @@
 	cursor: pointer;
 }
 
-.chorographia-neighbor-group {
-	display: inline-flex;
-	align-items: center;
-}
-
-.chorographia-zone-granularity {
-	display: inline-flex;
-	align-items: center;
-	margin-left: 4px;
-}
-
-.chorographia-view-switch {
-	display: inline-flex;
-	align-items: center;
-	gap: 5px;
-	cursor: pointer;
-	-webkit-tap-highlight-color: transparent;
-	touch-action: manipulation;
-	user-select: none;
-}
-
-.chorographia-view-switch .switch-label {
-	font-size: 11px;
-	color: #8E9AAF;
-	transition: color 0.2s;
-}
-
-.chorographia-view-switch .switch-label.is-active {
-	color: #D6D6E0;
-}
-
-.chorographia-view-switch .switch-track {
-	position: relative;
-	width: 32px;
-	height: 16px;
-	background: rgba(26, 26, 46, 0.9);
-	border: 1px solid rgba(44, 44, 58, 0.8);
-	border-radius: 8px;
-	transition: background 0.2s, border-color 0.2s;
-}
-
-.chorographia-view-switch .switch-thumb {
-	position: absolute;
-	top: 2px;
-	left: 2px;
-	width: 10px;
-	height: 10px;
-	background: #8E9AAF;
-	border-radius: 50%;
-	transition: transform 0.2s, background 0.2s;
-}
-
-.chorographia-view-switch.is-local .switch-track {
-	background: rgba(90, 198, 206, 0.15);
-	border-color: rgba(90, 198, 206, 0.5);
-}
-
-.chorographia-view-switch.is-local .switch-thumb {
-	transform: translateX(16px);
-	background: #5AC6CE;
-}
-
 /* ========== Light theme overrides ========== */
 
 .theme-light .chorographia-container {
@@ -162,35 +135,24 @@
 	border-color: rgba(160, 160, 180, 0.4);
 }
 
-.theme-light .chorographia-controls {
+.theme-light .chorographia-menu-btn {
 	color: #1e1e2e;
 	background: rgba(255, 255, 255, 0.88);
 	border-color: rgba(160, 160, 180, 0.4);
 }
 
-.theme-light .chorographia-controls select {
+.theme-light .chorographia-menu-btn:hover {
+	background: rgba(240, 240, 248, 0.95);
+}
+
+.theme-light .chorographia-menu {
+	color: #1e1e2e;
+	background: rgba(255, 255, 255, 0.92);
+	border-color: rgba(160, 160, 180, 0.4);
+}
+
+.theme-light .chorographia-menu select {
 	background: rgba(240, 240, 248, 0.95);
 	color: #1e1e2e;
 	border-color: rgba(160, 160, 180, 0.5);
-}
-
-.theme-light .chorographia-sep {
-	background: rgba(100, 100, 120, 0.25);
-}
-
-.theme-light .chorographia-view-switch .switch-label {
-	color: #6e6e80;
-}
-
-.theme-light .chorographia-view-switch .switch-label.is-active {
-	color: #1e1e2e;
-}
-
-.theme-light .chorographia-view-switch .switch-track {
-	background: rgba(220, 220, 235, 0.9);
-	border-color: rgba(160, 160, 180, 0.5);
-}
-
-.theme-light .chorographia-view-switch .switch-thumb {
-	background: #8E9AAF;
 }

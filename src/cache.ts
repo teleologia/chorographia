@@ -23,11 +23,15 @@ export interface ZoneCacheEntry {
 	centroids?: string[]; // base64-encoded Float32Arrays
 	subAssignments?: Record<number, Record<string, number>>; // globalZoneId → {path → subCluster}
 	subLabels?: Record<number, Record<number, string>>; // globalZoneId → {subCluster → label}
+	continents?: { id: number; zoneIds: number[]; label: string }[];
 }
 
 export interface PluginCache {
 	notes: Record<string, NoteCache>; // keyed by vault-relative path
 	zones?: Record<string, ZoneCacheEntry>; // keyed by `${k}_${model}`
+	lockedCentroids?: string[];    // base64-encoded Float32Array centroids from last full k-means
+	lockedLabels?: Record<number, string>;
+	lockedSubLabels?: Record<number, Record<number, string>>;
 }
 
 export function encodeFloat32(arr: Float32Array): string {

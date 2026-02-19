@@ -9,10 +9,9 @@ import { indexVault } from "./indexer";
 import { embedTexts } from "./openai";
 import { embedTextsOllama } from "./ollama";
 import { embedTextsOpenRouter } from "./openrouter";
-import { importSmartConnectionsEmbeddings } from "./smartconnections";
-import { computeLayout } from "./layout";
+import { computeLayout, interpolateNewPoints } from "./layout";
 import { kMeans, computeSemanticAssignments } from "./kmeans";
-import { decodeFloat32 } from "./cache";
+import { decodeFloat32, encodeFloat32 } from "./cache";
 import { ChorographiaView, VIEW_TYPE } from "./view";
 
 // Same palette as view.ts — used for explorer dots
@@ -87,12 +86,6 @@ export default class ChorographiaPlugin extends Plugin {
 			callback: () => this.runEmbedPipeline(),
 		});
 
-		this.addCommand({
-			id: "recompute-layout",
-			name: "Recompute layout",
-			callback: () => this.runLayoutCompute(),
-		});
-
 		this.addSettingTab(new ChorographiaSettingTab(this.app, this));
 
 		// Inject explorer dots once layout is ready
@@ -156,7 +149,6 @@ export default class ChorographiaPlugin extends Plugin {
 			case "ollama": return `ollama:${this.settings.ollamaEmbedModel}`;
 			case "openai": return `openai:${this.settings.embeddingModel}`;
 			case "openrouter": return `openrouter:${this.settings.openrouterEmbedModel}`;
-			case "smart-connections": return "smart-connections";
 		}
 	}
 
@@ -246,9 +238,6 @@ export default class ChorographiaPlugin extends Plugin {
 			case "openrouter":
 				results = await embedTextsOpenRouter(toEmbed, this.settings.openrouterApiKey, this.settings.openrouterEmbedModel, onProgress);
 				break;
-			case "smart-connections":
-				results = await importSmartConnectionsEmbeddings(this.app, toEmbed.map((t) => t.path));
-				break;
 		}
 
 		// Update cache with new embeddings
@@ -280,26 +269,41 @@ export default class ChorographiaPlugin extends Plugin {
 		}
 
 		// Invalidate zone cache when embeddings change
-		this.cache.zones = {};
+		if (this.settings.mapLocked) {
+			this.preserveAndInvalidateZones();
+		} else {
+			this.cache.zones = {};
+		}
 
 		// Compute semantic colors from k-means clustering
-		await this.computeSemanticColors();
+		if (this.settings.mapLocked) {
+			this.computeSemanticColorsLocked();
+		} else {
+			await this.computeSemanticColors();
+		}
 
 		await this.saveCache();
 		this.refreshMapViews();
 		this.updateExplorerDots();
 		new Notice(`Chorographia: Embedding complete (${results.length} new).`);
 
-		// Auto-compute layout if this is first run
+		// Auto-compute layout if this is first run or locked mode has new notes without coords
 		const hasLayout = Object.values(this.cache.notes).some(
 			(n) => n.x != null
 		);
-		if (!hasLayout) {
+		const hasNewWithoutCoords = this.settings.mapLocked &&
+			Object.values(this.cache.notes).some((n) => n.embedding && n.x == null);
+		if (!hasLayout || hasNewWithoutCoords) {
 			await this.runLayoutCompute();
 		}
 	}
 
 	async runZoneNaming(): Promise<void> {
+		// When locked, clear locked labels so LLM naming runs fresh
+		if (this.settings.mapLocked) {
+			delete this.cache.lockedLabels;
+			delete this.cache.lockedSubLabels;
+		}
 		// Invalidate zone cache so names are regenerated
 		this.cache.zones = {};
 		await this.saveCache();
@@ -391,27 +395,51 @@ export default class ChorographiaPlugin extends Plugin {
 			return;
 		}
 
-		new Notice(`Chorographia: Computing layout for ${count} notes...`);
+		if (this.settings.mapLocked) {
+			// Locked mode: only place notes that have embeddings but no coordinates
+			const newPaths = Object.entries(this.cache.notes)
+				.filter(([_, n]) => n.embedding && n.x == null)
+				.map(([p]) => p);
 
-		// Run UMAP in a timeout to avoid blocking UI
-		await new Promise<void>((resolve) => {
-			setTimeout(() => {
-				const points = computeLayout(this.cache.notes);
+			if (newPaths.length === 0) {
+				new Notice("Chorographia: All notes already placed.");
+			} else {
+				new Notice(`Chorographia: Placing ${newPaths.length} new notes...`);
+				const points = interpolateNewPoints(this.cache.notes, newPaths);
 				for (const p of points) {
 					if (this.cache.notes[p.path]) {
 						this.cache.notes[p.path].x = p.x;
 						this.cache.notes[p.path].y = p.y;
 					}
 				}
-				resolve();
-			}, 50);
-		});
+			}
 
-		// Invalidate zone cache when layout changes
-		this.cache.zones = {};
+			// Use locked semantic colors and preserve zone labels
+			this.computeSemanticColorsLocked();
+			this.preserveAndInvalidateZones();
+		} else {
+			new Notice(`Chorographia: Computing layout for ${count} notes...`);
 
-		// Recompute semantic colors
-		await this.computeSemanticColors();
+			// Run UMAP in a timeout to avoid blocking UI
+			await new Promise<void>((resolve) => {
+				setTimeout(() => {
+					const points = computeLayout(this.cache.notes);
+					for (const p of points) {
+						if (this.cache.notes[p.path]) {
+							this.cache.notes[p.path].x = p.x;
+							this.cache.notes[p.path].y = p.y;
+						}
+					}
+					resolve();
+				}, 50);
+			});
+
+			// Invalidate zone cache when layout changes
+			this.cache.zones = {};
+
+			// Recompute semantic colors
+			await this.computeSemanticColors();
+		}
 
 		await this.saveCache();
 		new Notice("Chorographia: Layout computed.");
@@ -446,5 +474,69 @@ export default class ChorographiaPlugin extends Plugin {
 				note.semW = assignments[i].semW;
 			}
 		}
+	}
+
+	/**
+	 * Assign semantic colors using cached locked centroids instead of re-running k-means.
+	 * Falls back to full computeSemanticColors if no locked centroids exist.
+	 */
+	computeSemanticColorsLocked(): void {
+		// Try lockedCentroids first, then any zone cache entry's centroids
+		let centroids: Float32Array[] | undefined;
+		if (this.cache.lockedCentroids && this.cache.lockedCentroids.length > 0) {
+			centroids = this.cache.lockedCentroids.map(c => decodeFloat32(c));
+		} else if (this.cache.zones) {
+			for (const entry of Object.values(this.cache.zones)) {
+				if (entry.centroids && entry.centroids.length > 0) {
+					centroids = entry.centroids.map(c => decodeFloat32(c));
+					break;
+				}
+			}
+		}
+
+		if (!centroids) {
+			// No cached centroids — fall back to full recompute
+			this.computeSemanticColors();
+			return;
+		}
+
+		const paths: string[] = [];
+		const vectors: Float32Array[] = [];
+		for (const [path, note] of Object.entries(this.cache.notes)) {
+			if (note.embedding) {
+				paths.push(path);
+				vectors.push(decodeFloat32(note.embedding));
+			}
+		}
+		if (vectors.length === 0) return;
+
+		const assignments = computeSemanticAssignments(vectors, centroids);
+		for (let i = 0; i < paths.length; i++) {
+			const note = this.cache.notes[paths[i]];
+			if (note) {
+				note.semA = assignments[i].semA;
+				note.semB = assignments[i].semB;
+				note.semW = assignments[i].semW;
+			}
+		}
+	}
+
+	/**
+	 * Extract labels + centroids from the most recent zone cache entry,
+	 * store them in the locked* fields, then wipe zone geometry cache.
+	 */
+	preserveAndInvalidateZones(): void {
+		if (this.cache.zones) {
+			// Find the most recent (any) zone cache entry with centroids
+			for (const entry of Object.values(this.cache.zones)) {
+				if (entry.centroids && entry.centroids.length > 0) {
+					this.cache.lockedCentroids = entry.centroids;
+					this.cache.lockedLabels = entry.labels;
+					this.cache.lockedSubLabels = entry.subLabels;
+					break;
+				}
+			}
+		}
+		this.cache.zones = {};
 	}
 }

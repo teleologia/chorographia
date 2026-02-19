@@ -3,14 +3,12 @@ import type ChorographiaPlugin from "./main";
 import type { NoteCache, ZoneCacheEntry } from "./cache";
 import { decodeFloat32, encodeFloat32 } from "./cache";
 import { kMeans, computeSemanticAssignments } from "./kmeans";
-import { Zone, computeZones, drawZone, transformZoneToLocal } from "./zones";
+import { Zone, Continent, BorderEdge, WorldMapResult, WorldMapSettings, computeZones, computeWorldMapZones, computeWorldMapSubZones, drawZone, drawZoneLabel } from "./zones";
 import { generateZoneNames } from "./zoneNaming";
 import { generateZoneNamesOllama } from "./ollama";
 import { generateZoneNamesOpenRouter } from "./openrouter";
 
 export const VIEW_TYPE = "chorographia-map";
-
-type ViewMode = "global" | "local";
 
 interface MapPoint {
 	path: string;
@@ -44,8 +42,6 @@ const TYPE_COLORS: Record<string, string> = {
 	SRC: "#8E9AAF", LIT: "#C9963B", SEED: "#B8541A",
 	EVE: "#B28DFF", REV: "#9AB2AF", NOTE: "#5AC6CE",
 };
-const NEIGHBOR_OPTIONS = [5, 10, 15, 20];
-
 // ---------- helpers ----------
 function hexToRgb(hex: string): [number, number, number] {
 	const n = parseInt(hex.slice(1), 16);
@@ -68,46 +64,29 @@ function hashStr(s: string): number {
 	for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
 	return Math.abs(h);
 }
-function dist2D(a: { x: number; y: number }, b: { x: number; y: number }): number {
-	const dx = a.x - b.x, dy = a.y - b.y;
-	return Math.sqrt(dx * dx + dy * dy);
-}
-
 // ---------- theme ----------
 interface ThemeColors {
 	panelBg: string;         // tooltip bg, minimap bg
-	labelPillBg: string;     // local label pill bg (more transparent)
 	panelBorder: string;     // borders on tooltips, minimap, controls
 	text: string;            // primary text (labels, tooltips)
 	textMuted: string;       // empty-state text, dimmed elements
-	minimapDimPoint: string; // non-local minimap points
-	linkStroke: string;      // link edges (global)
-	linkStrokeLocal: string; // link edges (local)
-	connectorLine: string;   // label connector lines
+	linkStroke: string;      // link edges
 }
 
 const DARK: ThemeColors = {
 	panelBg: "rgba(15,15,26,0.92)",
-	labelPillBg: "rgba(15,15,26,0.75)",
 	panelBorder: "rgba(44,44,58,0.6)",
 	text: "#D6D6E0",
 	textMuted: "#8E9AAF",
-	minimapDimPoint: "rgba(142,154,175,0.45)",
 	linkStroke: "rgba(214,214,224,0.18)",
-	linkStrokeLocal: "rgba(214,214,224,0.15)",
-	connectorLine: "rgba(142,154,175,0.2)",
 };
 
 const LIGHT: ThemeColors = {
 	panelBg: "rgba(255,255,255,0.92)",
-	labelPillBg: "rgba(255,255,255,0.78)",
 	panelBorder: "rgba(160,160,180,0.4)",
 	text: "#1e1e2e",
 	textMuted: "#6e6e80",
-	minimapDimPoint: "rgba(100,100,120,0.4)",
 	linkStroke: "rgba(60,60,80,0.22)",
-	linkStrokeLocal: "rgba(60,60,80,0.18)",
-	connectorLine: "rgba(100,100,120,0.25)",
 };
 
 // ---------- view ----------
@@ -122,6 +101,8 @@ export class ChorographiaView extends ItemView {
 	private allPoints: MapPoint[] = [];
 	private points: MapPoint[] = [];
 	private zones: Zone[] = [];
+	private continents: Continent[] = [];
+	private borderEdges: BorderEdge[] = [];
 	private subZonesMap = new Map<number, Zone[]>(); // globalZoneId → sub-zones (global coords)
 	private zoom = 1;
 	private panX = 0;
@@ -129,14 +110,15 @@ export class ChorographiaView extends ItemView {
 	private hoverIdx = -1;
 	private selectedIdx = -1;
 
-	// local view
-	private viewMode: ViewMode = "global";
-	private localCenterPath = "";
-	private localNeighborCount = 10;
-	private localZones: Zone[] = [];
-	private localCX = 0;
-	private localCY = 0;
-	private localScale = 1;
+	// animation
+	private animating = false;
+	private animStartTime = 0;
+	private animDuration = 800;
+	private animStartPanX = 0;
+	private animStartPanY = 0;
+	private animTargetPanX = 0;
+	private animTargetPanY = 0;
+	private animFrameId = 0;
 
 	// drag
 	private dragging = false;
@@ -151,12 +133,14 @@ export class ChorographiaView extends ItemView {
 
 	// controls
 	private statusEl!: HTMLDivElement;
-	private viewSwitchEl!: HTMLElement;
-	private neighborSelect!: HTMLSelectElement;
-	private neighborGroup!: HTMLElement;
+	private menuBtn!: HTMLButtonElement;
+	private menuPanel!: HTMLDivElement;
 	private colorModeSelect!: HTMLSelectElement;
 	private linksToggle!: HTMLInputElement;
 	private zonesToggle!: HTMLInputElement;
+	private subZonesToggle!: HTMLInputElement;
+	private titlesToggle!: HTMLInputElement;
+	private minimapSelect!: HTMLSelectElement;
 
 	constructor(leaf: WorkspaceLeaf, plugin: ChorographiaPlugin) {
 		super(leaf);
@@ -196,49 +180,24 @@ export class ChorographiaView extends ItemView {
 		this.syncActiveNoteSelection();
 	}
 
-	async onClose() {}
+	async onClose() {
+		cancelAnimationFrame(this.animFrameId);
+	}
 
 	// ===================== controls =====================
 
 	private buildControls(root: HTMLElement) {
-		const bar = root.createEl("div", { cls: "chorographia-controls" });
+		// Gear button
+		this.menuBtn = root.createEl("button", { cls: "chorographia-menu-btn", attr: { "aria-label": "Map settings" } });
+		this.menuBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`;
 
-		// View mode switch
-		this.viewSwitchEl = bar.createEl("div", { cls: "chorographia-view-switch" });
-		const globalLabel = this.viewSwitchEl.createEl("span", { cls: "switch-label is-active", text: "Global" });
-		const track = this.viewSwitchEl.createEl("div", { cls: "switch-track" });
-		track.createEl("div", { cls: "switch-thumb" });
-		const localLabel = this.viewSwitchEl.createEl("span", { cls: "switch-label", text: "Local" });
-		const toggleView = () => {
-			if (this.viewMode === "global") {
-				if (this.selectedIdx >= 0) this.enterLocalView(this.points[this.selectedIdx].path);
-			} else {
-				this.enterGlobalView();
-			}
-		};
-		this.viewSwitchEl.addEventListener("click", toggleView);
-		this.viewSwitchEl.addEventListener("touchend", (e) => { e.preventDefault(); toggleView(); });
+		// Menu panel
+		this.menuPanel = root.createEl("div", { cls: "chorographia-menu" });
 
-		// Neighbor count (only visible in local)
-		this.neighborGroup = bar.createEl("span", { cls: "chorographia-neighbor-group" });
-		this.neighborGroup.style.display = "none";
-		this.neighborGroup.createEl("span", { cls: "chorographia-sep" });
-		const nearLabel = this.neighborGroup.createEl("span", { text: "Near:" });
-		nearLabel.style.marginRight = "4px";
-		this.neighborSelect = this.neighborGroup.createEl("select");
-		for (const n of NEIGHBOR_OPTIONS)
-			this.neighborSelect.createEl("option", { text: String(n), value: String(n) });
-		this.neighborSelect.value = "10";
-		this.neighborSelect.addEventListener("change", () => {
-			this.localNeighborCount = parseInt(this.neighborSelect.value, 10);
-			if (this.viewMode === "local" && this.localCenterPath)
-				this.enterLocalView(this.localCenterPath);
-		});
-
-		// Color mode
-		bar.createEl("span", { cls: "chorographia-sep" });
-		bar.createEl("span", { text: "Color:" }).style.marginRight = "4px";
-		this.colorModeSelect = bar.createEl("select");
+		// Color row
+		const colorRow = this.menuPanel.createEl("div", { cls: "chorographia-menu-row" });
+		colorRow.createEl("span", { text: "Color" });
+		this.colorModeSelect = colorRow.createEl("select");
 		for (const [v, t] of [
 			["semantic", "Semantic"], ["folder", "Folder"],
 			["type", "Type"], ["cat", "Category"],
@@ -251,29 +210,80 @@ export class ChorographiaView extends ItemView {
 			this.draw();
 		});
 
-		// Links toggle
-		bar.createEl("span", { cls: "chorographia-sep" });
-		const lbl = bar.createEl("label", { cls: "chorographia-toggle-label" });
-		this.linksToggle = lbl.createEl("input", { type: "checkbox" });
+		// Links row
+		const linksRow = this.menuPanel.createEl("div", { cls: "chorographia-menu-row" });
+		const linksLbl = linksRow.createEl("label", { cls: "chorographia-toggle-label" });
+		this.linksToggle = linksLbl.createEl("input", { type: "checkbox" });
 		this.linksToggle.checked = this.plugin.settings.showLinks;
-		lbl.appendText(" Links");
+		linksLbl.appendText(" Links");
 		this.linksToggle.addEventListener("change", async () => {
 			this.plugin.settings.showLinks = this.linksToggle.checked;
 			await this.plugin.saveSettings();
 			this.draw();
 		});
 
-		// Zones toggle
-		bar.createEl("span", { cls: "chorographia-sep" });
-		const zoneLbl = bar.createEl("label", { cls: "chorographia-toggle-label" });
-		this.zonesToggle = zoneLbl.createEl("input", { type: "checkbox" });
+		// Zones row
+		const zonesRow = this.menuPanel.createEl("div", { cls: "chorographia-menu-row" });
+		const zonesLbl = zonesRow.createEl("label", { cls: "chorographia-toggle-label" });
+		this.zonesToggle = zonesLbl.createEl("input", { type: "checkbox" });
 		this.zonesToggle.checked = this.plugin.settings.showZones;
-		zoneLbl.appendText(" Zones");
+		zonesLbl.appendText(" Zones");
 		this.zonesToggle.addEventListener("change", async () => {
 			this.plugin.settings.showZones = this.zonesToggle.checked;
 			await this.plugin.saveSettings();
 			this.draw();
 		});
+
+		// Sub-zones row
+		const subZonesRow = this.menuPanel.createEl("div", { cls: "chorographia-menu-row" });
+		const subZonesLbl = subZonesRow.createEl("label", { cls: "chorographia-toggle-label" });
+		this.subZonesToggle = subZonesLbl.createEl("input", { type: "checkbox" });
+		this.subZonesToggle.checked = this.plugin.settings.showSubZones;
+		subZonesLbl.appendText(" Sub-zones");
+		this.subZonesToggle.addEventListener("change", async () => {
+			this.plugin.settings.showSubZones = this.subZonesToggle.checked;
+			await this.plugin.saveSettings();
+			this.draw();
+		});
+
+		// Titles row
+		const titlesRow = this.menuPanel.createEl("div", { cls: "chorographia-menu-row" });
+		const titlesLbl = titlesRow.createEl("label", { cls: "chorographia-toggle-label" });
+		this.titlesToggle = titlesLbl.createEl("input", { type: "checkbox" });
+		this.titlesToggle.checked = this.plugin.settings.showNoteTitles;
+		titlesLbl.appendText(" Titles");
+		this.titlesToggle.addEventListener("change", async () => {
+			this.plugin.settings.showNoteTitles = this.titlesToggle.checked;
+			await this.plugin.saveSettings();
+			this.draw();
+		});
+
+		// Minimap row
+		const minimapRow = this.menuPanel.createEl("div", { cls: "chorographia-menu-row" });
+		minimapRow.createEl("span", { text: "Minimap" });
+		this.minimapSelect = minimapRow.createEl("select");
+		for (const [v, t] of [
+			["off", "Off"], ["top-left", "TL"], ["top-right", "TR"],
+			["bottom-left", "BL"], ["bottom-right", "BR"],
+		] as const)
+			this.minimapSelect.createEl("option", { text: t, value: v });
+		this.minimapSelect.value = this.plugin.settings.minimapCorner;
+		this.minimapSelect.addEventListener("change", async () => {
+			this.plugin.settings.minimapCorner = this.minimapSelect.value as any;
+			await this.plugin.saveSettings();
+			this.draw();
+		});
+
+		// Toggle menu on gear click
+		this.menuBtn.addEventListener("click", (e) => {
+			e.stopPropagation();
+			this.menuPanel.classList.toggle("is-open");
+		});
+
+		// Close menu when clicking canvas
+		this.canvas.addEventListener("mousedown", () => {
+			this.menuPanel.classList.remove("is-open");
+		}, true);
 	}
 
 	// ===================== data =====================
@@ -305,14 +315,22 @@ export class ChorographiaView extends ItemView {
 		this.hoverIdx = -1;
 		this.selectedIdx = -1;
 		this.updateStatus();
-		await this.computeAndCacheZones();
+		try {
+			await this.computeAndCacheZones();
+		} catch (e) {
+			console.error("Chorographia: zone computation failed", e);
+		}
 		this.draw();
 	}
 
 	private async computeAndCacheZones(): Promise<void> {
 		const k = this.plugin.settings.zoneGranularity;
 		const model = this.plugin.embeddingModelString;
-		const cacheKey = `${k}_${model}`;
+		const s = this.plugin.settings;
+		const cacheKey = s.zoneStyle === "worldmap"
+			? `${k}_${model}_worldmap_${s.worldmapSeaLevel}_${s.worldmapUnity}_${s.worldmapRuggedness}`
+			: `${k}_${model}_${s.zoneStyle}`;
+		const isWorldmap = this.plugin.settings.zoneStyle === "worldmap";
 
 		// Check cache (require subAssignments — invalidate old cache without them)
 		const cached = this.plugin.cache.zones?.[cacheKey];
@@ -327,7 +345,45 @@ export class ChorographiaView extends ItemView {
 				}
 			}
 			if (pointsForZones.length > 0) {
-				this.zones = computeZones(pointsForZones, assignments, k);
+				if (isWorldmap) {
+					// Rebuild sub-centroids from cached sub-assignments
+					const subCentroidsByCluster = new Map<number, { x: number; y: number }[]>();
+					if (cached.subAssignments) {
+						for (const zoneIdStr of Object.keys(cached.subAssignments)) {
+							const zoneId = Number(zoneIdStr);
+							const subAssign = cached.subAssignments[zoneId];
+							if (!subAssign) continue;
+							const subGroups = new Map<number, { x: number; y: number }[]>();
+							for (const p of this.allPoints) {
+								if (subAssign[p.path] != null) {
+									const s = subAssign[p.path];
+									if (!subGroups.has(s)) subGroups.set(s, []);
+									subGroups.get(s)!.push({ x: p.x, y: p.y });
+								}
+							}
+							const subCentroids: { x: number; y: number }[] = [];
+							for (const [_, pts] of [...subGroups].sort((a, b) => a[0] - b[0])) {
+								let cx = 0, cy = 0;
+								for (const p of pts) { cx += p.x; cy += p.y; }
+								subCentroids.push({ x: cx / pts.length, y: cy / pts.length });
+							}
+							subCentroidsByCluster.set(zoneId, subCentroids);
+						}
+					}
+					const wmSettings: WorldMapSettings = {
+						seaLevel: this.plugin.settings.worldmapSeaLevel,
+						unity: this.plugin.settings.worldmapUnity,
+						ruggedness: this.plugin.settings.worldmapRuggedness,
+					};
+					const result = computeWorldMapZones(pointsForZones, assignments, k, subCentroidsByCluster, wmSettings);
+					this.zones = result.zones;
+					this.continents = result.continents;
+					this.borderEdges = result.borderEdges;
+				} else {
+					this.zones = computeZones(pointsForZones, assignments, k);
+					this.continents = [];
+					this.borderEdges = [];
+				}
 				// Apply cached labels
 				for (const zone of this.zones) {
 					if (cached.labels[zone.id]) zone.label = cached.labels[zone.id];
@@ -348,7 +404,9 @@ export class ChorographiaView extends ItemView {
 						}
 						if (subPts.length > 0) {
 							const localK = Math.max(2, Math.round(k / 4));
-							const subZones = computeZones(subPts, subIdx, localK);
+							const subZones = isWorldmap
+								? computeWorldMapSubZones(zone.hull, subPts, subIdx, localK)
+								: computeZones(subPts, subIdx, localK);
 							const subLabels = cached.subLabels?.[zone.id];
 							if (subLabels) {
 								for (const sz of subZones) {
@@ -404,8 +462,34 @@ export class ChorographiaView extends ItemView {
 			return;
 		}
 
-		// Run k-means
-		const { assignments, centroids } = kMeans(vectors, k);
+		// Run k-means (or assign to locked centroids)
+		let assignments: number[];
+		let centroids: Float32Array[];
+
+		const locked = this.plugin.settings.mapLocked;
+		const lockedCentroids = this.plugin.cache.lockedCentroids;
+
+		if (locked && lockedCentroids && lockedCentroids.length > 0) {
+			// Assign each note to the nearest locked centroid
+			centroids = lockedCentroids.map(c => decodeFloat32(c));
+			assignments = vectors.map(v => {
+				let bestIdx = 0, bestDist = Infinity;
+				for (let c = 0; c < centroids.length; c++) {
+					let sum = 0;
+					for (let d = 0; d < v.length; d++) {
+						const diff = v[d] - centroids[c][d];
+						sum += diff * diff;
+					}
+					const dist = Math.sqrt(sum);
+					if (dist < bestDist) { bestDist = dist; bestIdx = c; }
+				}
+				return bestIdx;
+			});
+		} else {
+			const result = kMeans(vectors, k);
+			assignments = result.assignments;
+			centroids = result.centroids;
+		}
 
 		// Build assignment map for cache
 		const assignMap: Record<string, number> = {};
@@ -423,71 +507,127 @@ export class ChorographiaView extends ItemView {
 			}
 		}
 
-		this.zones = computeZones(pointsForZones, pointAssignments, k);
+		// Build path→vector lookup and group by cluster
+		const vecByPath = new Map<string, Float32Array>();
+		for (let i = 0; i < paths.length; i++) vecByPath.set(paths[i], vectors[i]);
+
+		const localK = Math.max(2, Math.round(k / 4));
+		const subAssignmentsCache: Record<number, Record<string, number>> = {};
+		const subLabelsCache: Record<number, Record<number, string>> = {};
+
+		// Group paths by cluster assignment
+		const clusterMembers = new Map<number, { path: string; vec: Float32Array; x: number; y: number }[]>();
+		for (let i = 0; i < paths.length; i++) {
+			const c = assignments[i];
+			if (!clusterMembers.has(c)) clusterMembers.set(c, []);
+			const pt = this.allPoints.find((p) => p.path === paths[i]);
+			if (pt) clusterMembers.get(c)!.push({ path: paths[i], vec: vectors[i], x: pt.x, y: pt.y });
+		}
+
+		// Compute sub-centroids per cluster (needed for worldmap province mesh)
+		const subCentroidsByCluster = new Map<number, { x: number; y: number }[]>();
+		for (const [clusterId, members] of clusterMembers) {
+			if (members.length < localK) continue;
+
+			const { assignments: subAssignments } = kMeans(members.map((m) => m.vec), localK);
+			const subAssignMap: Record<string, number> = {};
+			for (let i = 0; i < members.length; i++) subAssignMap[members[i].path] = subAssignments[i];
+			subAssignmentsCache[clusterId] = subAssignMap;
+
+			// Compute XY centroids per sub-cluster
+			const subGroups = new Map<number, { x: number; y: number }[]>();
+			for (let i = 0; i < members.length; i++) {
+				const s = subAssignments[i];
+				if (!subGroups.has(s)) subGroups.set(s, []);
+				subGroups.get(s)!.push({ x: members[i].x, y: members[i].y });
+			}
+			const subCentroids: { x: number; y: number }[] = [];
+			for (const [_, pts] of [...subGroups].sort((a, b) => a[0] - b[0])) {
+				let cx = 0, cy = 0;
+				for (const p of pts) { cx += p.x; cy += p.y; }
+				subCentroids.push({ x: cx / pts.length, y: cy / pts.length });
+			}
+			subCentroidsByCluster.set(clusterId, subCentroids);
+		}
+
+		if (isWorldmap) {
+			const wmSettings: WorldMapSettings = {
+				seaLevel: this.plugin.settings.worldmapSeaLevel,
+				unity: this.plugin.settings.worldmapUnity,
+				ruggedness: this.plugin.settings.worldmapRuggedness,
+			};
+			const result = computeWorldMapZones(pointsForZones, pointAssignments, k, subCentroidsByCluster, wmSettings);
+			this.zones = result.zones;
+			this.continents = result.continents;
+			this.borderEdges = result.borderEdges;
+		} else {
+			this.zones = computeZones(pointsForZones, pointAssignments, k);
+			this.continents = [];
+			this.borderEdges = [];
+		}
 
 		// Optionally enhance labels with LLM
 		const labelMap: Record<number, string> = {};
 		for (const z of this.zones) labelMap[z.id] = z.label;
 
-		if (this.plugin.settings.enableLLMZoneNaming) {
-			const clusters = this.zones.map((z) => ({
-				idx: z.id,
-				titles: z.memberPaths.map((p) => {
-					const note = this.plugin.cache.notes[p];
-					return note?.title || p.split("/").pop() || p;
-				}),
-			}));
-			let llmNames = new Map<number, string>();
-			if (this.plugin.settings.llmProvider === "ollama") {
-				llmNames = await generateZoneNamesOllama(clusters, this.plugin.settings.ollamaUrl, this.plugin.settings.ollamaLlmModel);
-			} else if (this.plugin.settings.llmProvider === "openai" && this.plugin.settings.openaiApiKey) {
-				llmNames = await generateZoneNames(clusters, this.plugin.settings.openaiApiKey);
-			} else if (this.plugin.settings.llmProvider === "openrouter" && this.plugin.settings.openrouterApiKey) {
-				llmNames = await generateZoneNamesOpenRouter(clusters, this.plugin.settings.openrouterApiKey, this.plugin.settings.openrouterLlmModel);
-			}
-			for (const [idx, name] of llmNames) {
-				labelMap[idx] = name;
-				const zone = this.zones.find((z) => z.id === idx);
-				if (zone) zone.label = name;
+		const skipLLMNaming = locked
+			&& this.plugin.cache.lockedLabels
+			&& Object.keys(this.plugin.cache.lockedLabels).length > 0;
+
+		if (this.plugin.settings.enableLLMZoneNaming && !skipLLMNaming) {
+			try {
+				const clusters = this.zones.map((z) => ({
+					idx: z.id,
+					titles: z.memberPaths.map((p) => {
+						const note = this.plugin.cache.notes[p];
+						return note?.title || p.split("/").pop() || p;
+					}),
+				}));
+				let llmNames = new Map<number, string>();
+				if (this.plugin.settings.llmProvider === "ollama") {
+					llmNames = await generateZoneNamesOllama(clusters, this.plugin.settings.ollamaUrl, this.plugin.settings.ollamaLlmModel);
+				} else if (this.plugin.settings.llmProvider === "openai" && this.plugin.settings.openaiApiKey) {
+					llmNames = await generateZoneNames(clusters, this.plugin.settings.openaiApiKey);
+				} else if (this.plugin.settings.llmProvider === "openrouter" && this.plugin.settings.openrouterApiKey) {
+					llmNames = await generateZoneNamesOpenRouter(clusters, this.plugin.settings.openrouterApiKey, this.plugin.settings.openrouterLlmModel);
+				}
+				for (const [idx, name] of llmNames) {
+					labelMap[idx] = name;
+					const zone = this.zones.find((z) => z.id === idx);
+					if (zone) zone.label = name;
+				}
+			} catch (e) {
+				console.error("Chorographia: LLM zone naming failed", e);
 			}
 		}
 
-		// Compute sub-zones for each global zone
-		const localK = Math.max(2, Math.round(k / 4));
-		const subAssignmentsCache: Record<number, Record<string, number>> = {};
-		const subLabelsCache: Record<number, Record<number, string>> = {};
+		// Build sub-zone geometry + labels
 		const allSubClusters: { zoneId: number; idx: number; titles: string[] }[] = [];
 		this.subZonesMap.clear();
 
-		// Build path→vector lookup
-		const vecByPath = new Map<string, Float32Array>();
-		for (let i = 0; i < paths.length; i++) vecByPath.set(paths[i], vectors[i]);
-
 		for (const zone of this.zones) {
-			const memberVecs: Float32Array[] = [];
-			const memberPaths: string[] = [];
-			for (const p of zone.memberPaths) {
-				const v = vecByPath.get(p);
-				if (v) { memberVecs.push(v); memberPaths.push(p); }
+			const subAssignMap = subAssignmentsCache[zone.id];
+			if (!subAssignMap) continue;
+
+			const subPts: { path: string; x: number; y: number; folder: string; cat: string }[] = [];
+			const subIdx: number[] = [];
+			for (const p of this.allPoints) {
+				if (subAssignMap[p.path] != null) {
+					subPts.push({ path: p.path, x: p.x, y: p.y, folder: p.folder, cat: p.cat });
+					subIdx.push(subAssignMap[p.path]);
+				}
 			}
-			if (memberVecs.length < localK) continue;
+			if (subPts.length === 0) continue;
 
-			const { assignments: subAssignments } = kMeans(memberVecs, localK);
-			const subAssignMap: Record<string, number> = {};
-			for (let i = 0; i < memberPaths.length; i++) subAssignMap[memberPaths[i]] = subAssignments[i];
-			subAssignmentsCache[zone.id] = subAssignMap;
-
-			// Build sub-zone geometry using global coords
-			const subPts = memberPaths.map((path) => {
-				const pt = this.allPoints.find((p) => p.path === path)!;
-				return { path: pt.path, x: pt.x, y: pt.y, folder: pt.folder, cat: pt.cat };
-			});
-			const subZones = computeZones(subPts, subAssignments, localK);
+			// For starmap: generate full sub-zone geometry
+			// For worldmap: provinces are in the mesh, but still generate for labels
+			const subZones = isWorldmap
+				? computeWorldMapSubZones(zone.hull, subPts, subIdx, localK)
+				: computeZones(subPts, subIdx, localK);
 
 			const subLabelMap: Record<number, string> = {};
 			for (const sz of subZones) subLabelMap[sz.id] = sz.label;
 
-			// Collect for batch LLM naming
 			for (const sz of subZones) {
 				allSubClusters.push({
 					zoneId: zone.id,
@@ -504,26 +644,53 @@ export class ChorographiaView extends ItemView {
 		}
 
 		// LLM-name sub-zones in one batch
-		if (this.plugin.settings.enableLLMZoneNaming && allSubClusters.length > 0) {
-			// Use composite index to disambiguate across zones
-			const batchClusters = allSubClusters.map((c, i) => ({
-				idx: i,
-				titles: c.titles,
-			}));
-			let llmNames = new Map<number, string>();
-			if (this.plugin.settings.llmProvider === "ollama") {
-				llmNames = await generateZoneNamesOllama(batchClusters, this.plugin.settings.ollamaUrl, this.plugin.settings.ollamaLlmModel);
-			} else if (this.plugin.settings.llmProvider === "openai" && this.plugin.settings.openaiApiKey) {
-				llmNames = await generateZoneNames(batchClusters, this.plugin.settings.openaiApiKey);
-			} else if (this.plugin.settings.llmProvider === "openrouter" && this.plugin.settings.openrouterApiKey) {
-				llmNames = await generateZoneNamesOpenRouter(batchClusters, this.plugin.settings.openrouterApiKey, this.plugin.settings.openrouterLlmModel);
+		if (this.plugin.settings.enableLLMZoneNaming && !skipLLMNaming && allSubClusters.length > 0) {
+			try {
+				const batchClusters = allSubClusters.map((c, i) => ({
+					idx: i,
+					titles: c.titles,
+				}));
+				let llmNames = new Map<number, string>();
+				if (this.plugin.settings.llmProvider === "ollama") {
+					llmNames = await generateZoneNamesOllama(batchClusters, this.plugin.settings.ollamaUrl, this.plugin.settings.ollamaLlmModel);
+				} else if (this.plugin.settings.llmProvider === "openai" && this.plugin.settings.openaiApiKey) {
+					llmNames = await generateZoneNames(batchClusters, this.plugin.settings.openaiApiKey);
+				} else if (this.plugin.settings.llmProvider === "openrouter" && this.plugin.settings.openrouterApiKey) {
+					llmNames = await generateZoneNamesOpenRouter(batchClusters, this.plugin.settings.openrouterApiKey, this.plugin.settings.openrouterLlmModel);
+				}
+				for (const [batchIdx, name] of llmNames) {
+					const c = allSubClusters[batchIdx];
+					subLabelsCache[c.zoneId][c.idx] = name;
+					const subZones = this.subZonesMap.get(c.zoneId);
+					const sz = subZones?.find((z) => z.id === c.idx);
+					if (sz) sz.label = name;
+				}
+			} catch (e) {
+				console.error("Chorographia: LLM sub-zone naming failed", e);
 			}
-			for (const [batchIdx, name] of llmNames) {
-				const c = allSubClusters[batchIdx];
-				subLabelsCache[c.zoneId][c.idx] = name;
-				const subZones = this.subZonesMap.get(c.zoneId);
-				const sz = subZones?.find((z) => z.id === c.idx);
-				if (sz) sz.label = name;
+		}
+
+		// Override labels with locked labels when map is locked
+		if (locked && this.plugin.cache.lockedLabels) {
+			for (const zone of this.zones) {
+				const lockedLabel = this.plugin.cache.lockedLabels[zone.id];
+				if (lockedLabel) {
+					zone.label = lockedLabel;
+					labelMap[zone.id] = lockedLabel;
+				}
+			}
+		}
+		if (locked && this.plugin.cache.lockedSubLabels) {
+			for (const [zoneId, subZones] of this.subZonesMap) {
+				const lockedSubs = this.plugin.cache.lockedSubLabels[zoneId];
+				if (!lockedSubs) continue;
+				for (const sz of subZones) {
+					const lockedLabel = lockedSubs[sz.id];
+					if (lockedLabel) {
+						sz.label = lockedLabel;
+						subLabelsCache[zoneId][sz.id] = lockedLabel;
+					}
+				}
 			}
 		}
 
@@ -542,84 +709,42 @@ export class ChorographiaView extends ItemView {
 		await this.plugin.saveCache();
 	}
 
-	// ===================== view switching =====================
+	// ===================== animation =====================
 
-	private enterLocalView(centerPath: string) {
-		const center = this.allPoints.find((p) => p.path === centerPath);
-		if (!center) return;
-		this.localCenterPath = centerPath;
-
-		// Gather N nearest + center
-		const sorted = this.allPoints
-			.map((p) => ({ p, d: dist2D(center, p) }))
-			.sort((a, b) => a.d - b.d)
-			.slice(0, this.localNeighborCount + 1);
-
-		// Re-normalize local coordinates so they fill [-1, 1] while preserving ratios
-		const localPts = sorted.map((s) => ({ ...s.p })); // shallow clone
-		let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-		for (const p of localPts) {
-			if (p.x < minX) minX = p.x;
-			if (p.x > maxX) maxX = p.x;
-			if (p.y < minY) minY = p.y;
-			if (p.y > maxY) maxY = p.y;
-		}
-		const cx = (minX + maxX) / 2;
-		const cy = (minY + maxY) / 2;
-		const range = Math.max(maxX - minX, maxY - minY) || 0.01;
-		const scale = 1.6 / range; // fill ~80% of [-1,1]
-		for (const p of localPts) {
-			p.x = (p.x - cx) * scale;
-			p.y = (p.y - cy) * scale;
-		}
-
-		// Store transform for mapping global zone → local space
-		this.localCX = cx;
-		this.localCY = cy;
-		this.localScale = scale;
-
-		// Look up pre-computed sub-zones from the parent global zone
-		this.localZones = [];
-		const parentZone = this.zones.find((z) => z.memberPaths.includes(centerPath));
-		if (parentZone) {
-			const subZones = this.subZonesMap.get(parentZone.id);
-			if (subZones) {
-				this.localZones = subZones.map((sz) =>
-					transformZoneToLocal(sz, cx, cy, scale)
-				);
-			}
-		}
-
-		this.points = localPts;
-		this.selectedIdx = localPts.findIndex((p) => p.path === centerPath);
-		this.hoverIdx = -1;
-		this.zoom = 1;
-		this.panX = 0;
-		this.panY = 0;
-		this.viewMode = "local";
-		this.viewSwitchEl.classList.add("is-local");
-		this.updateSwitchLabels();
-		this.neighborGroup.style.display = "inline-flex";
-		this.updateStatus();
-		this.draw();
+	private animateTo(worldX: number, worldY: number) {
+		const w = this.canvas.clientWidth, h = this.canvas.clientHeight;
+		const s = Math.min(w, h) * 0.42 * this.zoom;
+		this.animStartPanX = this.panX;
+		this.animStartPanY = this.panY;
+		this.animTargetPanX = -worldX * s;
+		this.animTargetPanY = worldY * s;
+		this.animStartTime = performance.now();
+		this.animating = true;
+		this.animFrameId = requestAnimationFrame((now) => this.animTick(now));
 	}
 
-	private enterGlobalView() {
-		this.points = this.allPoints;
-		this.hoverIdx = -1;
-		this.selectedIdx = -1;
-		this.localCenterPath = "";
-		this.localZones = [];
-		this.zoom = 1;
-		this.panX = 0;
-		this.panY = 0;
-		this.viewMode = "global";
-		this.viewSwitchEl.classList.remove("is-local");
-		this.updateSwitchLabels();
-		this.neighborGroup.style.display = "none";
-		this.syncActiveNoteSelection();
-		this.updateStatus();
+	private animTick(now: number) {
+		if (!this.animating) return;
+		let t = (now - this.animStartTime) / this.animDuration;
+		if (t >= 1) {
+			t = 1;
+			this.animating = false;
+		}
+		// easeOutCubic
+		const ease = 1 - Math.pow(1 - t, 3);
+		this.panX = this.animStartPanX + (this.animTargetPanX - this.animStartPanX) * ease;
+		this.panY = this.animStartPanY + (this.animTargetPanY - this.animStartPanY) * ease;
 		this.draw();
+		if (this.animating) {
+			this.animFrameId = requestAnimationFrame((now) => this.animTick(now));
+		}
+	}
+
+	private cancelAnimation() {
+		if (this.animating) {
+			this.animating = false;
+			cancelAnimationFrame(this.animFrameId);
+		}
 	}
 
 	// ===================== coordinate transforms =====================
@@ -687,9 +812,9 @@ export class ChorographiaView extends ItemView {
 			return;
 		}
 
-		const isLocal = this.viewMode === "local";
 		const showLinks = this.plugin.settings.showLinks;
 		const isSem = this.plugin.settings.colorMode === "semantic";
+		const zoom = this.zoom;
 
 		// path→idx
 		const idx = new Map<string, number>();
@@ -699,24 +824,290 @@ export class ChorographiaView extends ItemView {
 		const scr: ScreenPt[] = pts.map((p) => this.w2s(p.x, p.y));
 
 		// ---------- zones ----------
-		if (this.plugin.settings.showZones) {
+		if (this.plugin.settings.showZones && this.zones.length > 0) {
 			const w2sFn = (wx: number, wy: number) => this.w2s(wx, wy);
-			if (isLocal) {
-				// Layer 1: global parent zone transformed to local space (faded)
-				if (this.zones.length > 0) {
-					const centerZone = this.zones.find((z) => z.memberPaths.includes(this.localCenterPath));
-					if (centerZone) {
-						const transformed = transformZoneToLocal(centerZone, this.localCX, this.localCY, this.localScale);
-						drawZone(ctx, transformed, w2sFn, 0.4);
+			const isWorldmap = this.plugin.settings.zoneStyle === "worldmap";
+			const isDarkTheme = document.body.classList.contains("theme-dark");
+
+			// Sub-zones fade in at zoom 2-5
+			let subAlpha = Math.max(0, Math.min(1, (zoom - 2) / 3));
+			if (!this.plugin.settings.showSubZones) subAlpha = 0;
+			const globalZoneAlpha = 1 - subAlpha * 0.3;
+			const parentFillFade = 1 - subAlpha; // fill crossfades out
+
+			if (isWorldmap && this.continents.length > 0) {
+				// ---------- WORLDMAP rendering ----------
+
+				// Ocean background
+				ctx.fillStyle = isDarkTheme ? "#0a0e1a" : "#e8eef5";
+				ctx.fillRect(0, 0, W, H);
+
+				const zoneById = new Map<number, Zone>();
+				for (const zone of this.zones) zoneById.set(zone.id, zone);
+
+				for (const continent of this.continents) {
+					const memberZones = continent.zoneIds
+						.map((id) => zoneById.get(id))
+						.filter((z): z is Zone => !!z);
+					if (memberZones.length === 0) continue;
+
+					// Clip to coastline polygon
+					if (continent.coastline && continent.coastline.length >= 3) {
+						const coastScreen = continent.coastline.map((p) => w2sFn(p.x, p.y));
+
+						ctx.save();
+						ctx.beginPath();
+						ctx.moveTo(coastScreen[0].x, coastScreen[0].y);
+						for (let ci = 1; ci < coastScreen.length; ci++) {
+							ctx.lineTo(coastScreen[ci].x, coastScreen[ci].y);
+						}
+						ctx.closePath();
+						ctx.clip();
+
+						// Fill individual cells per zone, with sub-domain shade variants
+						for (const zone of memberZones) {
+							if (!zone.cellPolygons || zone.cellPolygons.length === 0) continue;
+
+							if (subAlpha > 0.01 && zone.subDomainCells && zone.subDomainCells.size > 1) {
+								// Sub-domain shading: each province gets a slightly different shade
+								const subIds = [...zone.subDomainCells.keys()].sort((a, b) => a - b);
+								for (let si = 0; si < subIds.length; si++) {
+									const t = subIds.length > 1 ? si / (subIds.length - 1) : 0;
+									// Alternate between darkened and lightened shades for contrast
+									const targetShade = t < 0.5
+										? lerpColor(zone.color, "#000000", t * 0.8)
+										: lerpColor(zone.color, "#FFFFFF", (t - 0.5) * 1.0);
+									const shade = lerpColor(zone.color, targetShade, subAlpha);
+									const rgb = hexToRgb(shade);
+									// Crossfade: parent fill fades out, sub-domain fill fades in
+									const parentAlpha = 0.12 * globalZoneAlpha * parentFillFade;
+									const subFillAlpha = 0.22 * globalZoneAlpha * subAlpha;
+									const blendedAlpha = parentAlpha + subFillAlpha;
+									ctx.fillStyle = `rgba(${rgb.join(",")},${blendedAlpha})`;
+									for (const cell of zone.subDomainCells.get(subIds[si])!) {
+										if (cell.length < 3) continue;
+										ctx.beginPath();
+										const s0 = w2sFn(cell[0].x, cell[0].y);
+										ctx.moveTo(s0.x, s0.y);
+										for (let vi = 1; vi < cell.length; vi++) {
+											const sv = w2sFn(cell[vi].x, cell[vi].y);
+											ctx.lineTo(sv.x, sv.y);
+										}
+										ctx.closePath();
+										ctx.fill();
+									}
+								}
+							} else {
+								// No sub-domains or zoomed out: flat parent fill
+								const fillAlpha = 0.12 * globalZoneAlpha;
+								ctx.fillStyle = `rgba(${hexToRgb(zone.color).join(",")},${fillAlpha})`;
+								for (const cell of zone.cellPolygons) {
+									if (cell.length < 3) continue;
+									ctx.beginPath();
+									const s0 = w2sFn(cell[0].x, cell[0].y);
+									ctx.moveTo(s0.x, s0.y);
+									for (let vi = 1; vi < cell.length; vi++) {
+										const sv = w2sFn(cell[vi].x, cell[vi].y);
+										ctx.lineTo(sv.x, sv.y);
+									}
+									ctx.closePath();
+									ctx.fill();
+								}
+							}
+						}
+
+						// Draw edges by visual priority: provinces (minor) → borders (major)
+						const provinceAlpha = 0.2;
+						const continentZoneSet = new Set(continent.zoneIds);
+
+						// 1. Province borders (dashed, minor)
+						if (provinceAlpha > 0.01) {
+							const provColor = isDarkTheme
+								? `rgba(200,220,255,${provinceAlpha})`
+								: `rgba(40,60,100,${provinceAlpha})`;
+							ctx.setLineDash([3, 4]);
+							ctx.strokeStyle = provColor;
+							ctx.lineWidth = 0.8;
+							for (const edge of this.borderEdges) {
+								if (edge.edgeType !== "province") continue;
+								if (!continentZoneSet.has(edge.leftZone) && !continentZoneSet.has(edge.rightZone)) continue;
+								const edgeScreen = edge.vertices.map((p) => w2sFn(p.x, p.y));
+								if (edgeScreen.length < 2) continue;
+								ctx.beginPath();
+								ctx.moveTo(edgeScreen[0].x, edgeScreen[0].y);
+								for (let ei = 1; ei < edgeScreen.length; ei++) ctx.lineTo(edgeScreen[ei].x, edgeScreen[ei].y);
+								ctx.stroke();
+							}
+							ctx.setLineDash([]);
+						}
+
+						// 2. Country borders (solid, draws over province lines)
+						const borderColor = isDarkTheme ? "rgba(200,220,255,0.2)" : "rgba(40,60,100,0.2)";
+						ctx.strokeStyle = borderColor;
+						ctx.lineWidth = 1;
+						for (const edge of this.borderEdges) {
+							if (edge.edgeType !== "border") continue;
+							if (!continentZoneSet.has(edge.leftZone) && !continentZoneSet.has(edge.rightZone)) continue;
+							const edgeScreen = edge.vertices.map((p) => w2sFn(p.x, p.y));
+							if (edgeScreen.length < 2) continue;
+							ctx.beginPath();
+							ctx.moveTo(edgeScreen[0].x, edgeScreen[0].y);
+							for (let ei = 1; ei < edgeScreen.length; ei++) ctx.lineTo(edgeScreen[ei].x, edgeScreen[ei].y);
+							ctx.stroke();
+						}
+
+						ctx.restore(); // pop coastline clip
+
+						// Coastline stroke (over everything)
+						ctx.save();
+						ctx.beginPath();
+						ctx.moveTo(coastScreen[0].x, coastScreen[0].y);
+						for (let ci = 1; ci < coastScreen.length; ci++) {
+							ctx.lineTo(coastScreen[ci].x, coastScreen[ci].y);
+						}
+						ctx.closePath();
+						const coastColor = isDarkTheme ? "rgba(200,220,255,0.35)" : "rgba(40,60,100,0.35)";
+						ctx.shadowColor = coastColor;
+						ctx.shadowBlur = 10;
+						ctx.strokeStyle = coastColor;
+						ctx.lineWidth = 2;
+						ctx.stroke();
+						ctx.shadowBlur = 0;
+						ctx.restore();
+					} else {
+						// Fallback: no coastline, draw cells directly without clip
+						for (const zone of memberZones) {
+							if (zone.cellPolygons) {
+								const fillAlpha = 0.12 * globalZoneAlpha;
+								ctx.fillStyle = `rgba(${hexToRgb(zone.color).join(",")},${fillAlpha})`;
+								for (const cell of zone.cellPolygons) {
+									if (cell.length < 3) continue;
+									ctx.beginPath();
+									const s0 = w2sFn(cell[0].x, cell[0].y);
+									ctx.moveTo(s0.x, s0.y);
+									for (let vi = 1; vi < cell.length; vi++) {
+										const sv = w2sFn(cell[vi].x, cell[vi].y);
+										ctx.lineTo(sv.x, sv.y);
+									}
+									ctx.closePath();
+									ctx.fill();
+								}
+							}
+						}
 					}
 				}
-				// Layer 2: local sub-zones at full alpha with dashed border
-				for (const zone of this.localZones) {
-					drawZone(ctx, zone, w2sFn, 1, true);
-				}
-			} else if (this.zones.length > 0) {
+
+				// Zone labels (inside each country)
 				for (const zone of this.zones) {
-					drawZone(ctx, zone, w2sFn, 1);
+					if (!zone.cellPolygons || zone.cellPolygons.length === 0) continue;
+					// Compute centroid from all cell vertices
+					let cx = 0, cy = 0, count = 0;
+					for (const cell of zone.cellPolygons) {
+						for (const v of cell) { cx += v.x; cy += v.y; count++; }
+					}
+					if (count === 0) continue;
+					cx /= count; cy /= count;
+					const spt = w2sFn(cx, cy);
+
+					ctx.save();
+					ctx.font = "600 9px var(--font-interface)";
+					ctx.textAlign = "center";
+					ctx.textBaseline = "middle";
+					ctx.letterSpacing = "1.5px";
+					ctx.fillStyle = `rgba(${hexToRgb(zone.color).join(",")},${0.5 * globalZoneAlpha})`;
+					ctx.fillText(zone.label.toUpperCase(), spt.x, spt.y);
+					ctx.letterSpacing = "0px";
+					ctx.restore();
+				}
+
+				// Province labels (fade in with zoom, italic, smaller)
+				// Positioned at centroid of actual mesh cells, not note positions
+				if (subAlpha > 0.01) {
+					for (const zone of this.zones) {
+						if (!zone.subDomainCells || zone.subDomainCells.size <= 1) continue;
+						const subZones = this.subZonesMap.get(zone.id);
+						if (!subZones) continue;
+
+						const subIds = [...zone.subDomainCells.keys()].sort((a, b) => a - b);
+						for (let si = 0; si < subIds.length; si++) {
+							const cells = zone.subDomainCells.get(subIds[si]);
+							if (!cells || cells.length === 0) continue;
+							const sz = subZones[si];
+							if (!sz) continue;
+
+							// Centroid from mesh cell vertices (matches visible province area)
+							let cx = 0, cy = 0, count = 0;
+							for (const cell of cells) {
+								for (const v of cell) { cx += v.x; cy += v.y; count++; }
+							}
+							if (count === 0) continue;
+							cx /= count; cy /= count;
+							const spt = w2sFn(cx, cy);
+
+							ctx.save();
+							ctx.font = "7px var(--font-interface)";
+							ctx.textAlign = "center";
+							ctx.textBaseline = "middle";
+							ctx.fillStyle = `rgba(${hexToRgb(zone.color).join(",")},${0.4 * subAlpha})`;
+							ctx.translate(spt.x, spt.y);
+							ctx.transform(1, 0, -0.21, 1, 0, 0);
+							ctx.fillText(sz.label, 0, 0);
+							ctx.restore();
+						}
+					}
+				}
+
+				// Continent labels (multi-zone only, fade out with zoom)
+				const continentLabelAlpha = Math.max(0, 1 - (zoom - 1) / 2);
+				if (continentLabelAlpha > 0.01) {
+					for (const continent of this.continents) {
+						if (continent.zoneIds.length <= 1) continue;
+						const memberZones = continent.zoneIds
+							.map((id) => zoneById.get(id))
+							.filter((z): z is Zone => !!z);
+						if (memberZones.length <= 1) continue;
+
+						let cx = 0, cy = 0;
+						for (const z of memberZones) {
+							const blobCx = z.blob.reduce((s, p) => s + p.x, 0) / z.blob.length;
+							const blobCy = z.blob.reduce((s, p) => s + p.y, 0) / z.blob.length;
+							cx += blobCx; cy += blobCy;
+						}
+						cx /= memberZones.length; cy /= memberZones.length;
+						const spt = w2sFn(cx, cy);
+
+						ctx.save();
+						ctx.globalAlpha = continentLabelAlpha;
+						ctx.font = "bold 14px var(--font-interface)";
+						ctx.textAlign = "center";
+						ctx.textBaseline = "middle";
+						ctx.letterSpacing = "3px";
+						ctx.fillStyle = isDarkTheme ? "rgba(200,220,255,0.4)" : "rgba(40,60,100,0.4)";
+						ctx.fillText(continent.label.toUpperCase(), spt.x, spt.y - 20);
+						ctx.letterSpacing = "0px";
+						ctx.restore();
+					}
+				}
+			} else {
+				// ---------- STARMAP rendering (original) ----------
+				for (const zone of this.zones) {
+					drawZone(ctx, zone, w2sFn, globalZoneAlpha, false, isWorldmap, false, undefined, parentFillFade);
+				}
+
+				if (subAlpha > 0.01) {
+					for (const zone of this.zones) {
+						const subZones = this.subZonesMap.get(zone.id);
+						if (!subZones) continue;
+
+						const shades = subZones.map((_, i) => {
+							const t = subZones.length > 1 ? i / (subZones.length - 1) : 0;
+							return lerpColor(zone.color, "#FFFFFF", 0.15 + t * 0.35);
+						});
+
+						for (let si = 0; si < subZones.length; si++) {
+							drawZone(ctx, subZones[si], w2sFn, subAlpha, true, false, false, shades[si]);
+						}
+					}
 				}
 			}
 		}
@@ -724,8 +1115,8 @@ export class ChorographiaView extends ItemView {
 		// ---------- links ----------
 		if (showLinks) {
 			ctx.save();
-			ctx.strokeStyle = isLocal ? th.linkStrokeLocal : th.linkStroke;
-			ctx.lineWidth = isLocal ? 0.8 : 1;
+			ctx.strokeStyle = th.linkStroke;
+			ctx.lineWidth = 1;
 			for (let i = 0; i < pts.length; i++) {
 				for (const link of pts[i].links) {
 					const j = idx.get(link);
@@ -764,9 +1155,7 @@ export class ChorographiaView extends ItemView {
 		}
 
 		// ---------- points ----------
-		const baseR = isLocal
-			? Math.max(5, 4 * this.zoom)
-			: Math.max(2.5, 2.5 * this.zoom);
+		const baseR = Math.max(1.5, 1.5 * zoom);
 
 		for (let i = 0; i < pts.length; i++) {
 			const s = scr[i];
@@ -778,7 +1167,7 @@ export class ChorographiaView extends ItemView {
 			const alpha = hov || sel ? 1.0 : 0.78;
 
 			// subtle glow behind point
-			if (isLocal || this.zoom > 2) {
+			if (zoom > 2) {
 				const glowR = r * 2.5;
 				const grad = ctx.createRadialGradient(s.x, s.y, r * 0.3, s.x, s.y, glowR);
 				const c = this.color(pts[i]);
@@ -815,21 +1204,16 @@ export class ChorographiaView extends ItemView {
 		}
 
 		// ---------- labels ----------
-		if (isLocal) {
-			this.drawLocalLabels(ctx, pts, scr, baseR);
-		} else {
-			const alpha = Math.min(1, Math.max(0, (this.zoom - 3) / 3));
-			if (alpha > 0.01) this.drawGlobalLabels(ctx, pts, scr, alpha, W, H);
-		}
+		const labelAlpha = Math.min(1, Math.max(0, (zoom - 5) / 3));
+		if (labelAlpha > 0.01 && this.plugin.settings.showNoteTitles) this.drawGlobalLabels(ctx, pts, scr, labelAlpha, W, H);
 
-		// ---------- minimap (local only) ----------
-		if (isLocal) {
+		// ---------- minimap ----------
+		if (zoom > 1.2 && this.plugin.settings.minimapCorner !== "off") {
 			this.drawMinimap(ctx, W, H);
 		}
 
-		// ---------- hover tooltip (global, when labels hidden) ----------
-		const globalAlpha = Math.min(1, Math.max(0, (this.zoom - 3) / 3));
-		if (this.hoverIdx >= 0 && !isLocal && globalAlpha < 0.5) {
+		// ---------- hover tooltip (when labels hidden) ----------
+		if (this.hoverIdx >= 0 && labelAlpha < 0.5) {
 			this.drawTooltip(ctx, scr[this.hoverIdx], pts[this.hoverIdx].title);
 		}
 	}
@@ -862,100 +1246,17 @@ export class ChorographiaView extends ItemView {
 
 	// ---------- labels ----------
 
-	private drawLocalLabels(ctx: CanvasRenderingContext2D, pts: MapPoint[], scr: ScreenPt[], baseR: number) {
-		const th = this.theme;
-		// Place labels using angle from center-of-mass to avoid overlap
-		const comX = scr.reduce((s, p) => s + p.x, 0) / scr.length;
-		const comY = scr.reduce((s, p) => s + p.y, 0) / scr.length;
-
-		const fontSize = 11;
-		ctx.font = `${fontSize}px var(--font-interface)`;
-
-		// Collect label rects to check overlap
-		const placed: { x: number; y: number; w: number; h: number }[] = [];
-
-		for (let i = 0; i < pts.length; i++) {
-			const s = scr[i];
-			const label = pts[i].title.length > 45 ? pts[i].title.slice(0, 42) + "..." : pts[i].title;
-			const tw = ctx.measureText(label).width;
-			const pad = 4;
-			const bw = tw + pad * 2;
-			const bh = fontSize + pad * 2;
-			const offset = baseR + 6;
-
-			// Angle from center of mass
-			const angle = Math.atan2(s.y - comY, s.x - comX);
-
-			// Try primary placement along angle, then flip
-			let bestX = 0, bestY = 0, bestOverlap = Infinity;
-			for (const flip of [0, Math.PI, Math.PI / 2, -Math.PI / 2]) {
-				const a = angle + flip;
-				let tx = s.x + Math.cos(a) * offset;
-				let ty = s.y + Math.sin(a) * offset;
-				// Anchor: if label is to the left of point, right-align
-				if (Math.cos(a) < -0.3) tx -= bw;
-				else if (Math.cos(a) < 0.3) tx -= bw / 2;
-				ty -= bh / 2;
-
-				let overlap = 0;
-				for (const r of placed) {
-					const ox = Math.max(0, Math.min(tx + bw, r.x + r.w) - Math.max(tx, r.x));
-					const oy = Math.max(0, Math.min(ty + bh, r.y + r.h) - Math.max(ty, r.y));
-					overlap += ox * oy;
-				}
-				if (overlap < bestOverlap) {
-					bestOverlap = overlap;
-					bestX = tx;
-					bestY = ty;
-					if (overlap === 0) break;
-				}
-			}
-
-			placed.push({ x: bestX, y: bestY, w: bw, h: bh });
-
-			const isSel = i === this.selectedIdx;
-
-			// pill background
-			ctx.fillStyle = isSel ? "rgba(201,150,59,0.18)" : th.labelPillBg;
-			ctx.beginPath();
-			ctx.roundRect(bestX, bestY, bw, bh, 4);
-			ctx.fill();
-
-			// border for selected
-			if (isSel) {
-				ctx.strokeStyle = "rgba(201,150,59,0.4)";
-				ctx.lineWidth = 1;
-				ctx.stroke();
-			}
-
-			// text
-			ctx.fillStyle = isSel ? "#C9963B" : th.text;
-			ctx.globalAlpha = isSel ? 1 : 0.88;
-			ctx.textAlign = "left";
-			ctx.fillText(label, bestX + pad, bestY + fontSize + pad - 2);
-			ctx.globalAlpha = 1;
-
-			// connector line
-			ctx.strokeStyle = th.connectorLine;
-			ctx.lineWidth = 0.5;
-			ctx.beginPath();
-			ctx.moveTo(s.x, s.y);
-			ctx.lineTo(bestX + bw / 2, bestY + bh / 2);
-			ctx.stroke();
-		}
-	}
-
 	private drawGlobalLabels(ctx: CanvasRenderingContext2D, pts: MapPoint[], scr: ScreenPt[], alpha: number, W: number, H: number) {
 		ctx.save();
 		ctx.globalAlpha = alpha;
-		ctx.font = "9px var(--font-interface)";
+		ctx.font = "5px var(--font-interface)";
 		ctx.fillStyle = this.theme.text;
 		ctx.textAlign = "left";
 		for (let i = 0; i < pts.length; i++) {
 			const s = scr[i];
 			if (s.x < -50 || s.x > W + 50 || s.y < -50 || s.y > H + 50) continue;
 			const t = pts[i].title.length > 40 ? pts[i].title.slice(0, 37) + "..." : pts[i].title;
-			ctx.fillText(t, s.x + 6, s.y + 3);
+			ctx.fillText(t, s.x + 4, s.y + 2);
 		}
 		ctx.restore();
 	}
@@ -982,26 +1283,15 @@ export class ChorographiaView extends ItemView {
 		ctx.fillText(label, tx, ty);
 	}
 
-	private updateSwitchLabels() {
-		const labels = this.viewSwitchEl.querySelectorAll(".switch-label");
-		if (this.viewMode === "local") {
-			labels[0]?.classList.remove("is-active");
-			labels[1]?.classList.add("is-active");
-		} else {
-			labels[0]?.classList.add("is-active");
-			labels[1]?.classList.remove("is-active");
-		}
-	}
-
 	// ===================== active note sync =====================
 
 	private syncActiveNoteSelection() {
 		const file = this.app.workspace.getActiveFile();
 		if (!file) return;
 		const idx = this.points.findIndex((p) => p.path === file.path);
-		if (idx >= 0 && idx !== this.selectedIdx) {
+		if (idx >= 0) {
 			this.selectedIdx = idx;
-			this.draw();
+			this.animateTo(this.points[idx].x, this.points[idx].y);
 		}
 	}
 
@@ -1049,35 +1339,101 @@ export class ChorographiaView extends ItemView {
 		const cxOff = ox + margin + (inner - rangeX * scale) / 2;
 		const cyOff = oy + margin + (inner - rangeY * scale) / 2;
 
-		const localPaths = new Set(this.points.map((p) => p.path));
+		// zone contours
+		if (this.plugin.settings.showZones && this.zones.length > 0) {
+			const w2m = (wx: number, wy: number) => ({
+				x: cxOff + (wx - minX) * scale,
+				y: cyOff + (maxY - wy) * scale,
+			});
+			const isWorldmap = this.plugin.settings.zoneStyle === "worldmap";
+			const isDark = document.body.classList.contains("theme-dark");
+			const borderCol = isDark ? "rgba(200,220,255,0.3)" : "rgba(40,60,100,0.3)";
+			ctx.strokeStyle = borderCol;
+			ctx.lineWidth = 0.8;
+			ctx.globalAlpha = 1;
 
-		// draw all points — local neighborhood highlighted, rest dimmed
+			if (isWorldmap && this.continents.length > 0) {
+				// Coastlines
+				for (const cont of this.continents) {
+					if (!cont.coastline || cont.coastline.length < 3) continue;
+					ctx.beginPath();
+					const s0 = w2m(cont.coastline[0].x, cont.coastline[0].y);
+					ctx.moveTo(s0.x, s0.y);
+					for (let i = 1; i < cont.coastline.length; i++) {
+						const sp = w2m(cont.coastline[i].x, cont.coastline[i].y);
+						ctx.lineTo(sp.x, sp.y);
+					}
+					ctx.closePath();
+					ctx.stroke();
+				}
+				// Country borders
+				for (const edge of this.borderEdges) {
+					if (edge.edgeType !== "border") continue;
+					if (edge.vertices.length < 2) continue;
+					ctx.beginPath();
+					const s0 = w2m(edge.vertices[0].x, edge.vertices[0].y);
+					ctx.moveTo(s0.x, s0.y);
+					for (let i = 1; i < edge.vertices.length; i++) {
+						const sp = w2m(edge.vertices[i].x, edge.vertices[i].y);
+						ctx.lineTo(sp.x, sp.y);
+					}
+					ctx.stroke();
+				}
+			} else {
+				// Starmap: draw zone blobs
+				for (const zone of this.zones) {
+					if (zone.blob.length < 3) continue;
+					ctx.beginPath();
+					const s0 = w2m(zone.blob[0].x, zone.blob[0].y);
+					ctx.moveTo(s0.x, s0.y);
+					for (let i = 1; i < zone.blob.length; i++) {
+						const sp = w2m(zone.blob[i].x, zone.blob[i].y);
+						ctx.lineTo(sp.x, sp.y);
+					}
+					ctx.closePath();
+					ctx.stroke();
+				}
+			}
+		}
+
+		// draw all points uniformly
 		for (const p of all) {
 			const sx = cxOff + (p.x - minX) * scale;
 			const sy = cyOff + (maxY - p.y) * scale; // flip y
-			const inLocal = localPaths.has(p.path);
 			ctx.beginPath();
-			ctx.arc(sx, sy, inLocal ? 3 : 1.5, 0, Math.PI * 2);
-			ctx.fillStyle = inLocal ? this.color(p) : th.minimapDimPoint;
-			ctx.globalAlpha = inLocal ? 1 : 0.7;
+			ctx.arc(sx, sy, 1.5, 0, Math.PI * 2);
+			ctx.fillStyle = this.color(p);
+			ctx.globalAlpha = 0.7;
 			ctx.fill();
 		}
 
 		// highlight selected
 		if (this.selectedIdx >= 0) {
 			const sp = this.points[this.selectedIdx];
-			const orig = all.find((p) => p.path === sp.path);
-			if (orig) {
-				const sx = cxOff + (orig.x - minX) * scale;
-				const sy = cyOff + (maxY - orig.y) * scale;
-				ctx.beginPath();
-				ctx.arc(sx, sy, 4, 0, Math.PI * 2);
-				ctx.strokeStyle = "#C9963B";
-				ctx.lineWidth = 1.5;
-				ctx.globalAlpha = 1;
-				ctx.stroke();
-			}
+			const sx = cxOff + (sp.x - minX) * scale;
+			const sy = cyOff + (maxY - sp.y) * scale;
+			ctx.beginPath();
+			ctx.arc(sx, sy, 4, 0, Math.PI * 2);
+			ctx.strokeStyle = "#C9963B";
+			ctx.lineWidth = 1.5;
+			ctx.globalAlpha = 1;
+			ctx.stroke();
 		}
+
+		// viewport rectangle
+		const topLeft = this.s2w(0, 0);
+		const bottomRight = this.s2w(W, H);
+		const vx1 = cxOff + (topLeft.x - minX) * scale;
+		const vy1 = cyOff + (maxY - topLeft.y) * scale;
+		const vx2 = cxOff + (bottomRight.x - minX) * scale;
+		const vy2 = cyOff + (maxY - bottomRight.y) * scale;
+		ctx.strokeStyle = th.text;
+		ctx.globalAlpha = 0.4;
+		ctx.lineWidth = 1;
+		ctx.strokeRect(
+			Math.min(vx1, vx2), Math.min(vy1, vy2),
+			Math.abs(vx2 - vx1), Math.abs(vy2 - vy1),
+		);
 
 		ctx.restore();
 	}
@@ -1088,6 +1444,7 @@ export class ChorographiaView extends ItemView {
 		const c = this.canvas;
 
 		c.addEventListener("mousedown", (e) => {
+			this.cancelAnimation();
 			this.dragging = true;
 			this.dragStartX = e.clientX;
 			this.dragStartY = e.clientY;
@@ -1134,6 +1491,7 @@ export class ChorographiaView extends ItemView {
 
 		c.addEventListener("wheel", (e) => {
 			e.preventDefault();
+			this.cancelAnimation();
 			const rect = c.getBoundingClientRect();
 			const mx = e.clientX - rect.left, my = e.clientY - rect.top;
 			const before = this.s2w(mx, my);
@@ -1153,6 +1511,7 @@ export class ChorographiaView extends ItemView {
 
 		c.addEventListener("touchstart", (e) => {
 			e.preventDefault();
+			this.cancelAnimation();
 			if (e.touches.length === 1) {
 				const t = e.touches[0];
 				this.dragging = true;
@@ -1224,8 +1583,8 @@ export class ChorographiaView extends ItemView {
 	private handleClick() {
 		const i = this.hoverIdx;
 		if (i < 0) {
-			if (this.viewMode === "local") this.enterGlobalView();
-			else { this.selectedIdx = -1; this.draw(); }
+			this.selectedIdx = -1;
+			this.draw();
 			return;
 		}
 
@@ -1237,31 +1596,18 @@ export class ChorographiaView extends ItemView {
 		const targetLeaf = leaves.length > 0 ? leaves[0] : this.app.workspace.getLeaf("tab");
 		targetLeaf.openFile(this.app.vault.getFileByPath(p.path)!);
 
-		// In local mode, re-center on clicked note
-		if (this.viewMode === "local") {
-			this.enterLocalView(p.path);
-		} else {
-			this.draw();
-		}
+		this.animateTo(p.x, p.y);
 	}
 
 	private updateStatus() {
-		const n = this.points.length, t = this.allPoints.length;
+		const t = this.allPoints.length;
 		const z = this.zoom.toFixed(1);
-		this.statusEl.textContent = this.viewMode === "local"
-			? `local: ${n}/${t} notes | zoom ${z}x`
-			: `${t} notes | zoom ${z}x`;
+		this.statusEl.textContent = `${t} notes | zoom ${z}x`;
 	}
 
 	async refresh(): Promise<void> {
-		const wasLocal = this.viewMode === "local";
-		const wasPath = this.localCenterPath;
 		await this.loadPoints();
-		if (wasLocal && wasPath) {
-			this.enterLocalView(wasPath);
-		} else {
-			this.resizeCanvas();
-			this.draw();
-		}
+		this.resizeCanvas();
+		this.draw();
 	}
 }

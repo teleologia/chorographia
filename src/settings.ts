@@ -3,10 +3,10 @@ import type ChorographiaPlugin from "./main";
 
 export type ColorMode = "semantic" | "folder" | "type" | "cat";
 
-export type MinimapCorner = "top-left" | "top-right" | "bottom-left" | "bottom-right";
+export type MinimapCorner = "off" | "top-left" | "top-right" | "bottom-left" | "bottom-right";
 
 export interface ChorographiaSettings {
-	embeddingProvider: "ollama" | "openai" | "openrouter" | "smart-connections";
+	embeddingProvider: "ollama" | "openai" | "openrouter";
 	ollamaUrl: string;
 	ollamaEmbedModel: string;
 	ollamaLlmModel: string;
@@ -26,6 +26,13 @@ export interface ChorographiaSettings {
 	showZones: boolean;
 	zoneGranularity: number;
 	enableLLMZoneNaming: boolean;
+	zoneStyle: "starmap" | "worldmap";
+	worldmapSeaLevel: number;       // 0.1 (flood) – 0.5 (drought)
+	worldmapUnity: number;          // 0.03 (islands) – 0.12 (pangea)
+	worldmapRuggedness: number;     // 0.1 (smooth) – 1.0 (jagged)
+	mapLocked: boolean;
+	showSubZones: boolean;
+	showNoteTitles: boolean;
 }
 
 export const DEFAULT_SETTINGS: ChorographiaSettings = {
@@ -49,6 +56,13 @@ export const DEFAULT_SETTINGS: ChorographiaSettings = {
 	showZones: false,
 	zoneGranularity: 6,
 	enableLLMZoneNaming: false,
+	zoneStyle: "starmap",
+	worldmapSeaLevel: 0.20,
+	worldmapUnity: 0.07,
+	worldmapRuggedness: 0.4,
+	mapLocked: true,
+	showSubZones: true,
+	showNoteTitles: true,
 };
 
 export class ChorographiaSettingTab extends PluginSettingTab {
@@ -149,7 +163,6 @@ export class ChorographiaSettingTab extends PluginSettingTab {
 					.addOption("ollama", "Ollama (local)")
 					.addOption("openai", "OpenAI")
 					.addOption("openrouter", "OpenRouter")
-					.addOption("smart-connections", "Smart Connections")
 					.setValue(this.plugin.settings.embeddingProvider)
 					.onChange(async (value) => {
 						this.plugin.settings.embeddingProvider = value as any;
@@ -194,10 +207,6 @@ export class ChorographiaSettingTab extends PluginSettingTab {
 							await this.plugin.saveSettings();
 						})
 				);
-		} else if (this.plugin.settings.embeddingProvider === "smart-connections") {
-			new Setting(containerEl)
-				.setName("Smart Connections")
-				.setDesc("Imports embeddings from the Smart Connections plugin. Make sure it is installed and has generated embeddings.");
 		}
 
 		new Setting(containerEl)
@@ -284,6 +293,68 @@ export class ChorographiaSettingTab extends PluginSettingTab {
 				});
 
 			new Setting(containerEl)
+				.setName("Zone style")
+				.setDesc("Star map: overlapping smooth blobs. World map: non-overlapping country shapes with fractal borders.")
+				.addDropdown((dd) => {
+					dd.addOption("starmap", "Star map");
+					dd.addOption("worldmap", "World map");
+					dd.setValue(this.plugin.settings.zoneStyle);
+					dd.onChange(async (value) => {
+						this.plugin.settings.zoneStyle = value as "starmap" | "worldmap";
+						await this.plugin.saveSettings();
+						this.plugin.refreshMapViews();
+						this.display(); // re-render to show/hide worldmap sliders
+					});
+				});
+
+			if (this.plugin.settings.zoneStyle === "worldmap") {
+				new Setting(containerEl)
+					.setName("Land density")
+					.setDesc("% of peak height that becomes land. High = sparse thin countries, low = thick flooded land.")
+					.addSlider((sl) =>
+						sl
+							.setLimits(0.05, 0.50, 0.01)
+							.setValue(this.plugin.settings.worldmapSeaLevel)
+							.setDynamicTooltip()
+							.onChange(async (value) => {
+								this.plugin.settings.worldmapSeaLevel = value;
+								await this.plugin.saveSettings();
+								this.plugin.refreshMapViews();
+							})
+					);
+
+				new Setting(containerEl)
+					.setName("Continental unity")
+					.setDesc("How far clusters reach to merge. Low = archipelago, high = pangea.")
+					.addSlider((sl) =>
+						sl
+							.setLimits(0.03, 0.12, 0.005)
+							.setValue(this.plugin.settings.worldmapUnity)
+							.setDynamicTooltip()
+							.onChange(async (value) => {
+								this.plugin.settings.worldmapUnity = value;
+								await this.plugin.saveSettings();
+								this.plugin.refreshMapViews();
+							})
+					);
+
+				new Setting(containerEl)
+					.setName("Coast ruggedness")
+					.setDesc("Higher = jagged fjords, lower = smooth beaches.")
+					.addSlider((sl) =>
+						sl
+							.setLimits(0.1, 1.0, 0.05)
+							.setValue(this.plugin.settings.worldmapRuggedness)
+							.setDynamicTooltip()
+							.onChange(async (value) => {
+								this.plugin.settings.worldmapRuggedness = value;
+								await this.plugin.saveSettings();
+								this.plugin.refreshMapViews();
+							})
+					);
+			}
+
+			new Setting(containerEl)
 				.setName("LLM zone naming")
 				.setDesc("Use an LLM to generate evocative names for each zone.")
 				.addToggle((toggle) =>
@@ -338,25 +409,20 @@ export class ChorographiaSettingTab extends PluginSettingTab {
 								})
 						);
 				}
-
-				new Setting(containerEl)
-					.setName("Re-run zone naming")
-					.setDesc("Regenerate LLM names for all zones and sub-zones.")
-					.addButton((btn) =>
-						btn.setButtonText("Run").onClick(async () => {
-							btn.setDisabled(true);
-							btn.setButtonText("Running...");
-							try {
-								await this.plugin.runZoneNaming();
-								new Notice("Chorographia: Zone naming complete.");
-							} catch (e: any) {
-								new Notice("Chorographia: " + e.message);
-							}
-							btn.setDisabled(false);
-							btn.setButtonText("Run");
-						})
-					);
 			}
+
+			new Setting(containerEl)
+				.setName("Lock map")
+				.setDesc("Preserve note positions, cluster assignments, and zone names across re-embeds.")
+				.addToggle((toggle) =>
+					toggle
+						.setValue(this.plugin.settings.mapLocked)
+						.onChange(async (value) => {
+							this.plugin.settings.mapLocked = value;
+							await this.plugin.saveSettings();
+							this.plugin.refreshMapViews();
+						})
+				);
 		}
 
 		// ======== Map Display ========
@@ -413,6 +479,7 @@ export class ChorographiaSettingTab extends PluginSettingTab {
 			.setDesc("Corner for the global minimap shown in local view.")
 			.addDropdown((dd) =>
 				dd
+					.addOption("off", "Off")
 					.addOption("top-left", "Top-left")
 					.addOption("top-right", "Top-right")
 					.addOption("bottom-left", "Bottom-left")
@@ -446,23 +513,28 @@ export class ChorographiaSettingTab extends PluginSettingTab {
 				})
 			);
 
-		new Setting(containerEl)
-			.setName("Recompute layout")
-			.setDesc("Run UMAP on cached embeddings to produce a new 2D layout.")
-			.addButton((btn) =>
-				btn.setButtonText("Run").onClick(async () => {
-					btn.setDisabled(true);
-					btn.setButtonText("Running...");
-					try {
-						await this.plugin.runLayoutCompute();
-						new Notice("Chorographia: Layout computed.");
-					} catch (e: any) {
-						new Notice("Chorographia: " + e.message);
-					}
-					btn.setDisabled(false);
-					btn.setButtonText("Run");
-				})
-			);
+		if (this.plugin.settings.enableLLMZoneNaming) {
+			new Setting(containerEl)
+				.setName("Re-run zone naming")
+				.setDesc("Regenerate LLM names for all zones and sub-zones.")
+				.addButton((btn) =>
+					btn.setButtonText("Run").onClick(async () => {
+						if (this.plugin.settings.mapLocked) {
+							if (!confirm("Map is locked. This will regenerate all zone names. Continue?")) return;
+						}
+						btn.setDisabled(true);
+						btn.setButtonText("Running...");
+						try {
+							await this.plugin.runZoneNaming();
+							new Notice("Chorographia: Zone naming complete.");
+						} catch (e: any) {
+							new Notice("Chorographia: " + e.message);
+						}
+						btn.setDisabled(false);
+						btn.setButtonText("Run");
+					})
+				);
+		}
 
 		new Setting(containerEl)
 			.setName("Clear cache")
@@ -472,11 +544,19 @@ export class ChorographiaSettingTab extends PluginSettingTab {
 					.setButtonText("Clear")
 					.setWarning()
 					.onClick(async () => {
-						if (confirm("Delete all Chorographia cached data?")) {
-							this.plugin.cache = { notes: {} };
-							await this.plugin.saveCache();
-							new Notice("Chorographia: Cache cleared.");
+						const locked = this.plugin.settings.mapLocked;
+						const msg = locked
+							? "Map is locked. Clearing cache will erase all positions, zone data, and locked names. Continue?"
+							: "This will erase all cached embeddings, positions, and zone data. You will need to re-embed to rebuild the map. Continue?";
+						if (!confirm(msg)) return;
+						this.plugin.cache = { notes: {} };
+						if (locked) {
+							this.plugin.settings.mapLocked = false;
+							await this.plugin.saveSettings();
 						}
+						await this.plugin.saveCache();
+						new Notice("Chorographia: Cache cleared.");
+						this.display();
 					})
 			);
 	}
