@@ -451,6 +451,18 @@ function drawItalicText(
 	ctx.restore();
 }
 
+export interface LabelConfig {
+	zoneLabelSize: number;
+	zoneLabelOpacity: number;
+	labelOutline: boolean;
+	labelOutlineWidth: number;
+}
+
+function contrastOutline(): string {
+	const isDark = document.body.classList.contains("theme-dark");
+	return isDark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.7)";
+}
+
 function hexToRgba(hex: string, alpha: number): string {
 	const n = parseInt(hex.slice(1), 16);
 	const r = (n >> 16) & 255;
@@ -469,6 +481,7 @@ export function drawZone(
 	skipLabel = false,
 	parentColor?: string,
 	fillFade = 1,
+	labelCfg?: LabelConfig,
 ): void {
 	const blob = zone.blob;
 	if (blob.length < 3) return;
@@ -521,16 +534,43 @@ export function drawZone(
 	if (!skipLabel) {
 		const cx = screenPts.reduce((s, p) => s + p.x, 0) / screenPts.length;
 		const cy = screenPts.reduce((s, p) => s + p.y, 0) / screenPts.length;
+		const zls = labelCfg?.zoneLabelSize ?? 9;
+		const zlo = labelCfg?.zoneLabelOpacity ?? 0.5;
+		const outline = labelCfg?.labelOutline ?? false;
+		const outlineW = labelCfg?.labelOutlineWidth ?? 2;
 
 		if (isSubZone) {
-			drawItalicText(ctx, zone.label, cx, cy, hexToRgba(color, 0.4 * alpha), 7);
+			const subSize = Math.max(5, zls - 2);
+			if (outline) {
+				ctx.save();
+				ctx.font = `${subSize}px var(--font-interface)`;
+				ctx.textAlign = "center";
+				ctx.textBaseline = "middle";
+				ctx.strokeStyle = contrastOutline();
+				ctx.lineWidth = outlineW;
+				ctx.lineJoin = "round";
+				ctx.globalAlpha = 0.4 * alpha;
+				ctx.translate(cx, cy);
+				ctx.transform(1, 0, -0.21, 1, 0, 0);
+				ctx.strokeText(zone.label, 0, 0);
+				ctx.restore();
+			}
+			drawItalicText(ctx, zone.label, cx, cy, hexToRgba(color, 0.4 * alpha), subSize);
 		} else {
-			ctx.font = "600 9px var(--font-interface)";
+			ctx.font = `600 ${zls}px var(--font-interface)`;
 			ctx.textAlign = "center";
 			ctx.textBaseline = "middle";
 			ctx.letterSpacing = "1.5px";
-			ctx.fillStyle = hexToRgba(color, 0.5 * alpha);
-			ctx.fillText(zone.label.toUpperCase(), cx, cy);
+			const txt = zone.label.toUpperCase();
+			if (outline) {
+				ctx.strokeStyle = contrastOutline();
+				ctx.lineWidth = outlineW;
+				ctx.lineJoin = "round";
+				ctx.globalAlpha = zlo * alpha;
+				ctx.strokeText(txt, cx, cy);
+			}
+			ctx.fillStyle = hexToRgba(color, zlo * alpha);
+			ctx.fillText(txt, cx, cy);
 			ctx.letterSpacing = "0px";
 		}
 	}
@@ -544,6 +584,7 @@ export function drawZoneLabel(
 	w2s: (wx: number, wy: number) => { x: number; y: number },
 	alpha: number,
 	parentColor?: string,
+	labelCfg?: LabelConfig,
 ): void {
 	const blob = zone.blob;
 	if (blob.length < 3) return;
@@ -552,17 +593,43 @@ export function drawZoneLabel(
 	const cx = screenPts.reduce((s, p) => s + p.x, 0) / screenPts.length;
 	const cy = screenPts.reduce((s, p) => s + p.y, 0) / screenPts.length;
 	const color = parentColor || zone.color;
+	const zls = labelCfg?.zoneLabelSize ?? 9;
+	const zlo = labelCfg?.zoneLabelOpacity ?? 0.5;
+	const outline = labelCfg?.labelOutline ?? false;
+	const outlineW = labelCfg?.labelOutlineWidth ?? 2;
 
 	ctx.save();
 	if (parentColor) {
-		drawItalicText(ctx, zone.label, cx, cy, hexToRgba(color, 0.4 * alpha), 7);
+		const subSize = Math.max(5, zls - 2);
+		if (outline) {
+			ctx.font = `${subSize}px var(--font-interface)`;
+			ctx.textAlign = "center";
+			ctx.textBaseline = "middle";
+			ctx.strokeStyle = contrastOutline();
+			ctx.lineWidth = outlineW;
+			ctx.lineJoin = "round";
+			ctx.globalAlpha = 0.4 * alpha;
+			ctx.translate(cx, cy);
+			ctx.transform(1, 0, -0.21, 1, 0, 0);
+			ctx.strokeText(zone.label, 0, 0);
+			ctx.setTransform(1, 0, 0, 1, 0, 0);
+		}
+		drawItalicText(ctx, zone.label, cx, cy, hexToRgba(color, 0.4 * alpha), subSize);
 	} else {
-		ctx.font = "600 9px var(--font-interface)";
+		ctx.font = `600 ${zls}px var(--font-interface)`;
 		ctx.textAlign = "center";
 		ctx.textBaseline = "middle";
 		ctx.letterSpacing = "1.5px";
-		ctx.fillStyle = hexToRgba(color, 0.5 * alpha);
-		ctx.fillText(zone.label.toUpperCase(), cx, cy);
+		const txt = zone.label.toUpperCase();
+		if (outline) {
+			ctx.strokeStyle = contrastOutline();
+			ctx.lineWidth = outlineW;
+			ctx.lineJoin = "round";
+			ctx.globalAlpha = zlo * alpha;
+			ctx.strokeText(txt, cx, cy);
+		}
+		ctx.fillStyle = hexToRgba(color, zlo * alpha);
+		ctx.fillText(txt, cx, cy);
 		ctx.letterSpacing = "0px";
 	}
 	ctx.restore();

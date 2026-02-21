@@ -11,6 +11,7 @@ export interface NoteCache {
 	semW?: number; // weight bucket (1-5): 1=mostly A, 5=mostly B
 	noteType?: string; // frontmatter "type" field
 	cat?: string; // frontmatter "cat" field
+	tags?: string[]; // frontmatter + inline tags
 	links: string[]; // wikilink targets (resolved paths)
 }
 

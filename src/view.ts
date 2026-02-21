@@ -3,7 +3,7 @@ import type ChorographiaPlugin from "./main";
 import type { NoteCache, ZoneCacheEntry } from "./cache";
 import { decodeFloat32, encodeFloat32 } from "./cache";
 import { kMeans, computeSemanticAssignments } from "./kmeans";
-import { Zone, Continent, BorderEdge, WorldMapResult, WorldMapSettings, computeZones, computeWorldMapZones, computeWorldMapSubZones, drawZone, drawZoneLabel } from "./zones";
+import { Zone, Continent, BorderEdge, WorldMapResult, WorldMapSettings, computeZones, computeWorldMapZones, computeWorldMapSubZones, drawZone, drawZoneLabel, type LabelConfig } from "./zones";
 import { generateZoneNames } from "./zoneNaming";
 import { generateZoneNamesOllama } from "./ollama";
 import { generateZoneNamesOpenRouter } from "./openrouter";
@@ -21,6 +21,7 @@ interface MapPoint {
 	semW: number;
 	noteType: string;
 	cat: string;
+	tags: string[];
 	links: string[];
 }
 
@@ -58,6 +59,10 @@ function lerpColor(c1: string, c2: string, t: number): string {
 		Math.round(g1 + (g2 - g1) * t),
 		Math.round(b1 + (b2 - b1) * t),
 	);
+}
+function themeOutlineColor(): string {
+	const isDark = document.body.classList.contains("theme-dark");
+	return isDark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.7)";
 }
 function hashStr(s: string): number {
 	let h = 0;
@@ -141,6 +146,12 @@ export class ChorographiaView extends ItemView {
 	private subZonesToggle!: HTMLInputElement;
 	private titlesToggle!: HTMLInputElement;
 	private minimapSelect!: HTMLSelectElement;
+	private searchInput!: HTMLInputElement;
+	private searchResults!: HTMLDivElement;
+	private zoneJumpSelect!: HTMLSelectElement;
+	private filterPanel!: HTMLDivElement;
+	private activeFolderFilters = new Set<string>();
+	private activeTagFilters = new Set<string>();
 
 	constructor(leaf: WorkspaceLeaf, plugin: ChorographiaPlugin) {
 		super(leaf);
@@ -274,6 +285,46 @@ export class ChorographiaView extends ItemView {
 			this.draw();
 		});
 
+		// Separator + Navigation
+		this.menuPanel.createEl("div", { cls: "chorographia-menu-sep" });
+
+		// Note search
+		const searchRow = this.menuPanel.createEl("div", { cls: "chorographia-menu-row chorographia-search-row" });
+		this.searchInput = searchRow.createEl("input", {
+			cls: "chorographia-search-input",
+			attr: { type: "text", placeholder: "Jump to note..." },
+		});
+		this.searchResults = this.menuPanel.createEl("div", { cls: "chorographia-search-results" });
+		this.searchInput.addEventListener("input", () => this.onSearchInput());
+		this.searchInput.addEventListener("keydown", (e) => {
+			if (e.key === "Enter") this.onSearchSelect();
+			if (e.key === "Escape") {
+				this.searchInput.value = "";
+				this.searchResults.empty();
+			}
+		});
+
+		// Zone jump
+		const zoneRow = this.menuPanel.createEl("div", { cls: "chorographia-menu-row" });
+		zoneRow.createEl("span", { text: "Zone" });
+		this.zoneJumpSelect = zoneRow.createEl("select");
+		this.zoneJumpSelect.createEl("option", { text: "—", value: "" });
+		this.zoneJumpSelect.addEventListener("change", () => this.onZoneJump());
+
+		// Filter section
+		this.menuPanel.createEl("div", { cls: "chorographia-menu-sep" });
+		const filterHeader = this.menuPanel.createEl("div", { cls: "chorographia-menu-row" });
+		filterHeader.createEl("span", { text: "Filters", cls: "chorographia-filter-header" });
+		const filterClearBtn = filterHeader.createEl("button", { cls: "chorographia-filter-clear", text: "Clear" });
+		filterClearBtn.addEventListener("click", () => this.clearFilters());
+		this.filterPanel = this.menuPanel.createEl("div", { cls: "chorographia-filter-panel" });
+
+		// Export row
+		this.menuPanel.createEl("div", { cls: "chorographia-menu-sep" });
+		const exportRow = this.menuPanel.createEl("div", { cls: "chorographia-menu-row" });
+		const exportBtn = exportRow.createEl("button", { cls: "chorographia-menu-export", text: "Export PNG" });
+		exportBtn.addEventListener("click", () => this.exportMap());
+
 		// Toggle menu on gear click
 		this.menuBtn.addEventListener("click", (e) => {
 			e.stopPropagation();
@@ -284,6 +335,174 @@ export class ChorographiaView extends ItemView {
 		this.canvas.addEventListener("mousedown", () => {
 			this.menuPanel.classList.remove("is-open");
 		}, true);
+	}
+
+	private exportMap() {
+		this.canvas.toBlob((blob) => {
+			if (!blob) {
+				new Notice("Chorographia: Export failed.");
+				return;
+			}
+			const url = URL.createObjectURL(blob);
+			const a = document.createElement("a");
+			a.href = url;
+			const date = new Date().toISOString().slice(0, 10);
+			a.download = `chorographia-${date}.png`;
+			document.body.appendChild(a);
+			a.click();
+			document.body.removeChild(a);
+			URL.revokeObjectURL(url);
+			new Notice("Chorographia: Map exported.");
+		}, "image/png");
+	}
+
+	private onSearchInput() {
+		const query = this.searchInput.value.toLowerCase().trim();
+		this.searchResults.empty();
+		if (!query || query.length < 2) return;
+
+		const matches = this.allPoints
+			.filter((p) => p.title.toLowerCase().includes(query))
+			.slice(0, 8);
+
+		for (const m of matches) {
+			const item = this.searchResults.createEl("div", {
+				cls: "chorographia-search-item",
+				text: m.title.length > 50 ? m.title.slice(0, 47) + "..." : m.title,
+			});
+			item.addEventListener("click", () => {
+				this.zoom = 8;
+				this.animateTo(m.x, m.y);
+				this.searchInput.value = "";
+				this.searchResults.empty();
+				this.menuPanel.classList.remove("is-open");
+			});
+		}
+	}
+
+	private onSearchSelect() {
+		const first = this.searchResults.querySelector(".chorographia-search-item") as HTMLElement | null;
+		if (first) first.click();
+	}
+
+	private onZoneJump() {
+		const val = this.zoneJumpSelect.value;
+		if (!val) return;
+		const idx = parseInt(val, 10);
+		const zone = this.zones[idx];
+		if (!zone) return;
+
+		// Compute zone centroid in world coords
+		const blob = zone.blob;
+		if (blob.length === 0) return;
+		const cx = blob.reduce((s, p) => s + p.x, 0) / blob.length;
+		const cy = blob.reduce((s, p) => s + p.y, 0) / blob.length;
+
+		this.zoom = 3;
+		this.animateTo(cx, cy);
+		this.zoneJumpSelect.value = "";
+		this.menuPanel.classList.remove("is-open");
+	}
+
+	private updateZoneJumpOptions() {
+		// Clear existing options (keep the placeholder)
+		while (this.zoneJumpSelect.options.length > 1) {
+			this.zoneJumpSelect.remove(1);
+		}
+		for (let i = 0; i < this.zones.length; i++) {
+			this.zoneJumpSelect.createEl("option", {
+				text: this.zones[i].label || `Zone ${i + 1}`,
+				value: String(i),
+			});
+		}
+	}
+
+	private buildFilterUI() {
+		this.filterPanel.empty();
+
+		// Collect unique folders and tags from all points
+		const folders = new Set<string>();
+		const tags = new Set<string>();
+		for (const p of this.allPoints) {
+			if (p.folder) folders.add(p.folder);
+			for (const t of p.tags) tags.add(t);
+		}
+
+		if (folders.size === 0 && tags.size === 0) {
+			this.filterPanel.createEl("span", {
+				text: "No filters available",
+				cls: "chorographia-filter-empty",
+			});
+			return;
+		}
+
+		// Folders
+		if (folders.size > 0) {
+			const folderSection = this.filterPanel.createEl("div", { cls: "chorographia-filter-section" });
+			folderSection.createEl("span", { text: "Folders", cls: "chorographia-filter-title" });
+			const folderList = folderSection.createEl("div", { cls: "chorographia-filter-list" });
+			for (const f of [...folders].sort()) {
+				const lbl = folderList.createEl("label", { cls: "chorographia-filter-item" });
+				const cb = lbl.createEl("input", { type: "checkbox" });
+				cb.checked = !this.activeFolderFilters.has(f);
+				lbl.appendText(` ${f}`);
+				cb.addEventListener("change", () => {
+					if (cb.checked) {
+						this.activeFolderFilters.delete(f);
+					} else {
+						this.activeFolderFilters.add(f);
+					}
+					this.applyFilters();
+				});
+			}
+		}
+
+		// Tags
+		if (tags.size > 0) {
+			const tagSection = this.filterPanel.createEl("div", { cls: "chorographia-filter-section" });
+			tagSection.createEl("span", { text: "Tags", cls: "chorographia-filter-title" });
+			const tagList = tagSection.createEl("div", { cls: "chorographia-filter-list" });
+			for (const t of [...tags].sort()) {
+				const lbl = tagList.createEl("label", { cls: "chorographia-filter-item" });
+				const cb = lbl.createEl("input", { type: "checkbox" });
+				cb.checked = !this.activeTagFilters.has(t);
+				lbl.appendText(` #${t}`);
+				cb.addEventListener("change", () => {
+					if (cb.checked) {
+						this.activeTagFilters.delete(t);
+					} else {
+						this.activeTagFilters.add(t);
+					}
+					this.applyFilters();
+				});
+			}
+		}
+	}
+
+	private applyFilters() {
+		const hasFolderFilter = this.activeFolderFilters.size > 0;
+		const hasTagFilter = this.activeTagFilters.size > 0;
+
+		if (!hasFolderFilter && !hasTagFilter) {
+			this.points = this.allPoints;
+		} else {
+			this.points = this.allPoints.filter((p) => {
+				if (hasFolderFilter && this.activeFolderFilters.has(p.folder)) return false;
+				if (hasTagFilter && !p.tags.some((t) => this.activeTagFilters.has(t))) return false;
+				return true;
+			});
+		}
+		this.updateStatus();
+		this.draw();
+	}
+
+	private clearFilters() {
+		this.activeFolderFilters.clear();
+		this.activeTagFilters.clear();
+		this.points = this.allPoints;
+		this.buildFilterUI();
+		this.updateStatus();
+		this.draw();
 	}
 
 	// ===================== data =====================
@@ -300,6 +519,7 @@ export class ChorographiaView extends ItemView {
 				title: n.title, folder: n.folder,
 				semA: n.semA ?? -1, semB: n.semB ?? -1, semW: n.semW ?? 3,
 				noteType: n.noteType || "", cat: n.cat || "",
+				tags: n.tags || [],
 				links: n.links || [],
 			};
 			pts.push(p);
@@ -320,6 +540,9 @@ export class ChorographiaView extends ItemView {
 		} catch (e) {
 			console.error("Chorographia: zone computation failed", e);
 		}
+		this.updateZoneJumpOptions();
+		this.buildFilterUI();
+		this.applyFilters();
 		this.draw();
 	}
 
@@ -1013,13 +1236,23 @@ export class ChorographiaView extends ItemView {
 					cx /= count; cy /= count;
 					const spt = w2sFn(cx, cy);
 
+					const zls = this.plugin.settings.zoneLabelSize;
+					const zlo = this.plugin.settings.zoneLabelOpacity;
 					ctx.save();
-					ctx.font = "600 9px var(--font-interface)";
+					ctx.font = `600 ${zls}px var(--font-interface)`;
 					ctx.textAlign = "center";
 					ctx.textBaseline = "middle";
 					ctx.letterSpacing = "1.5px";
-					ctx.fillStyle = `rgba(${hexToRgb(zone.color).join(",")},${0.5 * globalZoneAlpha})`;
-					ctx.fillText(zone.label.toUpperCase(), spt.x, spt.y);
+					const txt = zone.label.toUpperCase();
+					if (this.plugin.settings.labelOutline) {
+						ctx.strokeStyle = themeOutlineColor();
+						ctx.lineWidth = this.plugin.settings.labelOutlineWidth;
+						ctx.lineJoin = "round";
+						ctx.globalAlpha = zlo * globalZoneAlpha;
+						ctx.strokeText(txt, spt.x, spt.y);
+					}
+					ctx.fillStyle = `rgba(${hexToRgb(zone.color).join(",")},${zlo * globalZoneAlpha})`;
+					ctx.fillText(txt, spt.x, spt.y);
 					ctx.letterSpacing = "0px";
 					ctx.restore();
 				}
@@ -1048,13 +1281,21 @@ export class ChorographiaView extends ItemView {
 							cx /= count; cy /= count;
 							const spt = w2sFn(cx, cy);
 
+							const subSize = Math.max(5, this.plugin.settings.zoneLabelSize - 2);
 							ctx.save();
-							ctx.font = "7px var(--font-interface)";
+							ctx.font = `${subSize}px var(--font-interface)`;
 							ctx.textAlign = "center";
 							ctx.textBaseline = "middle";
-							ctx.fillStyle = `rgba(${hexToRgb(zone.color).join(",")},${0.4 * subAlpha})`;
 							ctx.translate(spt.x, spt.y);
 							ctx.transform(1, 0, -0.21, 1, 0, 0);
+							if (this.plugin.settings.labelOutline) {
+								ctx.strokeStyle = themeOutlineColor();
+								ctx.lineWidth = this.plugin.settings.labelOutlineWidth;
+								ctx.lineJoin = "round";
+								ctx.globalAlpha = 0.4 * subAlpha;
+								ctx.strokeText(sz.label, 0, 0);
+							}
+							ctx.fillStyle = `rgba(${hexToRgb(zone.color).join(",")},${0.4 * subAlpha})`;
 							ctx.fillText(sz.label, 0, 0);
 							ctx.restore();
 						}
@@ -1080,22 +1321,36 @@ export class ChorographiaView extends ItemView {
 						cx /= memberZones.length; cy /= memberZones.length;
 						const spt = w2sFn(cx, cy);
 
+						const contSize = Math.round(this.plugin.settings.zoneLabelSize * 1.5);
 						ctx.save();
 						ctx.globalAlpha = continentLabelAlpha;
-						ctx.font = "bold 14px var(--font-interface)";
+						ctx.font = `bold ${contSize}px var(--font-interface)`;
 						ctx.textAlign = "center";
 						ctx.textBaseline = "middle";
 						ctx.letterSpacing = "3px";
+						const contTxt = continent.label.toUpperCase();
+						if (this.plugin.settings.labelOutline) {
+							ctx.strokeStyle = isDarkTheme ? "rgba(0,0,0,0.5)" : "rgba(255,255,255,0.5)";
+							ctx.lineWidth = this.plugin.settings.labelOutlineWidth + 1;
+							ctx.lineJoin = "round";
+							ctx.strokeText(contTxt, spt.x, spt.y - 20);
+						}
 						ctx.fillStyle = isDarkTheme ? "rgba(200,220,255,0.4)" : "rgba(40,60,100,0.4)";
-						ctx.fillText(continent.label.toUpperCase(), spt.x, spt.y - 20);
+						ctx.fillText(contTxt, spt.x, spt.y - 20);
 						ctx.letterSpacing = "0px";
 						ctx.restore();
 					}
 				}
 			} else {
 				// ---------- STARMAP rendering (original) ----------
+				const lcfg: LabelConfig = {
+					zoneLabelSize: this.plugin.settings.zoneLabelSize,
+					zoneLabelOpacity: this.plugin.settings.zoneLabelOpacity,
+					labelOutline: this.plugin.settings.labelOutline,
+					labelOutlineWidth: this.plugin.settings.labelOutlineWidth,
+				};
 				for (const zone of this.zones) {
-					drawZone(ctx, zone, w2sFn, globalZoneAlpha, false, isWorldmap, false, undefined, parentFillFade);
+					drawZone(ctx, zone, w2sFn, globalZoneAlpha, false, isWorldmap, false, undefined, parentFillFade, lcfg);
 				}
 
 				if (subAlpha > 0.01) {
@@ -1109,7 +1364,7 @@ export class ChorographiaView extends ItemView {
 						});
 
 						for (let si = 0; si < subZones.length; si++) {
-							drawZone(ctx, subZones[si], w2sFn, subAlpha, true, false, false, shades[si]);
+							drawZone(ctx, subZones[si], w2sFn, subAlpha, true, false, false, shades[si], 1, lcfg);
 						}
 					}
 				}
@@ -1208,7 +1463,7 @@ export class ChorographiaView extends ItemView {
 		}
 
 		// ---------- labels ----------
-		const labelAlpha = Math.min(1, Math.max(0, (zoom - 5) / 3));
+		const labelAlpha = Math.min(1, Math.max(0, (zoom - 5) / 3)) * this.plugin.settings.noteTitleOpacity;
 		if (labelAlpha > 0.01 && this.plugin.settings.showNoteTitles) this.drawGlobalLabels(ctx, pts, scr, labelAlpha, W, H);
 
 		// ---------- minimap ----------
@@ -1251,15 +1506,25 @@ export class ChorographiaView extends ItemView {
 	// ---------- labels ----------
 
 	private drawGlobalLabels(ctx: CanvasRenderingContext2D, pts: MapPoint[], scr: ScreenPt[], alpha: number, W: number, H: number) {
+		const nts = this.plugin.settings.noteTitleSize;
+		const isDark = document.body.classList.contains("theme-dark");
+		const outlineOn = this.plugin.settings.labelOutline;
+		const outlineW = this.plugin.settings.labelOutlineWidth;
 		ctx.save();
 		ctx.globalAlpha = alpha;
-		ctx.font = "5px var(--font-interface)";
+		ctx.font = `${nts}px var(--font-interface)`;
 		ctx.fillStyle = this.theme.text;
 		ctx.textAlign = "left";
+		if (outlineOn) {
+			ctx.strokeStyle = isDark ? "rgba(10,14,26,0.9)" : "rgba(248,248,255,0.9)";
+			ctx.lineWidth = outlineW;
+			ctx.lineJoin = "round";
+		}
 		for (let i = 0; i < pts.length; i++) {
 			const s = scr[i];
 			if (s.x < -50 || s.x > W + 50 || s.y < -50 || s.y > H + 50) continue;
 			const t = pts[i].title.length > 40 ? pts[i].title.slice(0, 37) + "..." : pts[i].title;
+			if (outlineOn) ctx.strokeText(t, s.x + 4, s.y + 2);
 			ctx.fillText(t, s.x + 4, s.y + 2);
 		}
 		ctx.restore();

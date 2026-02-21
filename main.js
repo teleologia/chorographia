@@ -7475,7 +7475,13 @@ var DEFAULT_SETTINGS = {
   worldmapRuggedness: 0.4,
   mapLocked: false,
   showSubZones: true,
-  showNoteTitles: true
+  showNoteTitles: true,
+  zoneLabelSize: 9,
+  zoneLabelOpacity: 0.5,
+  noteTitleSize: 5,
+  noteTitleOpacity: 1,
+  labelOutline: true,
+  labelOutlineWidth: 2
 };
 var ChorographiaSettingTab = class extends import_obsidian.PluginSettingTab {
   constructor(app, plugin) {
@@ -7716,6 +7722,56 @@ var ChorographiaSettingTab = class extends import_obsidian.PluginSettingTab {
         this.plugin.refreshMapViews();
       })
     );
+    containerEl.createEl("h3", { text: "Label Appearance" });
+    containerEl.createEl("p", {
+      text: "Control the size, opacity, and contrast of zone and note labels on the map.",
+      cls: "setting-item-description"
+    });
+    new import_obsidian.Setting(containerEl).setName("Zone label size").setDesc("Font size for zone name labels (px).").addSlider(
+      (sl) => sl.setLimits(6, 18, 1).setValue(this.plugin.settings.zoneLabelSize).setDynamicTooltip().onChange(async (value) => {
+        this.plugin.settings.zoneLabelSize = value;
+        await this.plugin.saveSettings();
+        this.plugin.refreshMapViews();
+      })
+    );
+    new import_obsidian.Setting(containerEl).setName("Zone label opacity").setDesc("Opacity of zone name labels.").addSlider(
+      (sl) => sl.setLimits(0.1, 1, 0.05).setValue(this.plugin.settings.zoneLabelOpacity).setDynamicTooltip().onChange(async (value) => {
+        this.plugin.settings.zoneLabelOpacity = value;
+        await this.plugin.saveSettings();
+        this.plugin.refreshMapViews();
+      })
+    );
+    new import_obsidian.Setting(containerEl).setName("Note title size").setDesc("Font size for note title labels (px).").addSlider(
+      (sl) => sl.setLimits(3, 12, 1).setValue(this.plugin.settings.noteTitleSize).setDynamicTooltip().onChange(async (value) => {
+        this.plugin.settings.noteTitleSize = value;
+        await this.plugin.saveSettings();
+        this.plugin.refreshMapViews();
+      })
+    );
+    new import_obsidian.Setting(containerEl).setName("Note title opacity").setDesc("Opacity of note title labels when zoomed in.").addSlider(
+      (sl) => sl.setLimits(0.1, 1, 0.05).setValue(this.plugin.settings.noteTitleOpacity).setDynamicTooltip().onChange(async (value) => {
+        this.plugin.settings.noteTitleOpacity = value;
+        await this.plugin.saveSettings();
+        this.plugin.refreshMapViews();
+      })
+    );
+    new import_obsidian.Setting(containerEl).setName("Label outline").setDesc("Add a contrasting outline behind labels for readability.").addToggle(
+      (toggle) => toggle.setValue(this.plugin.settings.labelOutline).onChange(async (value) => {
+        this.plugin.settings.labelOutline = value;
+        await this.plugin.saveSettings();
+        this.display();
+        this.plugin.refreshMapViews();
+      })
+    );
+    if (this.plugin.settings.labelOutline) {
+      new import_obsidian.Setting(containerEl).setName("Outline width").setDesc("Thickness of the label outline (px).").addSlider(
+        (sl) => sl.setLimits(1, 4, 0.5).setValue(this.plugin.settings.labelOutlineWidth).setDynamicTooltip().onChange(async (value) => {
+          this.plugin.settings.labelOutlineWidth = value;
+          await this.plugin.saveSettings();
+          this.plugin.refreshMapViews();
+        })
+      );
+    }
     containerEl.createEl("h3", { text: "Actions" });
     new import_obsidian.Setting(containerEl).setName("Re-embed changed notes").setDesc("Index notes and compute embeddings for new/changed notes.").addButton(
       (btn) => btn.setButtonText("Run").onClick(async () => {
@@ -7851,12 +7907,27 @@ async function indexVault(vault, globs, excludeGlobs, maxNotes) {
       }
     }
     const folder = file.path.includes("/") ? file.path.split("/")[0] : "";
+    const tags = [];
+    const fmTags = fm.tags;
+    if (Array.isArray(fmTags)) {
+      for (const t of fmTags)
+        tags.push(String(t).replace(/^#/, ""));
+    } else if (typeof fmTags === "string" && fmTags) {
+      tags.push(fmTags.replace(/^#/, ""));
+    }
+    const inlineTagRe = /(?:^|\s)#([a-zA-Z][\w/-]*)/g;
+    let tagMatch;
+    while ((tagMatch = inlineTagRe.exec(body)) !== null) {
+      tags.push(tagMatch[1]);
+    }
+    const uniqueTags = [...new Set(tags)];
     results.push({
       path: file.path,
       title,
       folder,
       noteType: type,
       cat,
+      tags: uniqueTags,
       embedText,
       sha256,
       links: [...new Set(links)]
@@ -9875,6 +9946,10 @@ function drawItalicText(ctx, text, x, y, fillStyle, size) {
   ctx.fillText(text, 0, 0);
   ctx.restore();
 }
+function contrastOutline() {
+  const isDark = document.body.classList.contains("theme-dark");
+  return isDark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.7)";
+}
 function hexToRgba(hex, alpha) {
   const n = parseInt(hex.slice(1), 16);
   const r = n >> 16 & 255;
@@ -9882,7 +9957,7 @@ function hexToRgba(hex, alpha) {
   const b = n & 255;
   return `rgba(${r},${g},${b},${alpha})`;
 }
-function drawZone(ctx, zone, w2s, alpha, dashed = false, worldmap = false, skipLabel = false, parentColor, fillFade = 1) {
+function drawZone(ctx, zone, w2s, alpha, dashed = false, worldmap = false, skipLabel = false, parentColor, fillFade = 1, labelCfg) {
   const blob = zone.blob;
   if (blob.length < 3)
     return;
@@ -9926,15 +10001,42 @@ function drawZone(ctx, zone, w2s, alpha, dashed = false, worldmap = false, skipL
   if (!skipLabel) {
     const cx = screenPts.reduce((s, p) => s + p.x, 0) / screenPts.length;
     const cy = screenPts.reduce((s, p) => s + p.y, 0) / screenPts.length;
+    const zls = labelCfg?.zoneLabelSize ?? 9;
+    const zlo = labelCfg?.zoneLabelOpacity ?? 0.5;
+    const outline = labelCfg?.labelOutline ?? false;
+    const outlineW = labelCfg?.labelOutlineWidth ?? 2;
     if (isSubZone) {
-      drawItalicText(ctx, zone.label, cx, cy, hexToRgba(color, 0.4 * alpha), 7);
+      const subSize = Math.max(5, zls - 2);
+      if (outline) {
+        ctx.save();
+        ctx.font = `${subSize}px var(--font-interface)`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.strokeStyle = contrastOutline();
+        ctx.lineWidth = outlineW;
+        ctx.lineJoin = "round";
+        ctx.globalAlpha = 0.4 * alpha;
+        ctx.translate(cx, cy);
+        ctx.transform(1, 0, -0.21, 1, 0, 0);
+        ctx.strokeText(zone.label, 0, 0);
+        ctx.restore();
+      }
+      drawItalicText(ctx, zone.label, cx, cy, hexToRgba(color, 0.4 * alpha), subSize);
     } else {
-      ctx.font = "600 9px var(--font-interface)";
+      ctx.font = `600 ${zls}px var(--font-interface)`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.letterSpacing = "1.5px";
-      ctx.fillStyle = hexToRgba(color, 0.5 * alpha);
-      ctx.fillText(zone.label.toUpperCase(), cx, cy);
+      const txt = zone.label.toUpperCase();
+      if (outline) {
+        ctx.strokeStyle = contrastOutline();
+        ctx.lineWidth = outlineW;
+        ctx.lineJoin = "round";
+        ctx.globalAlpha = zlo * alpha;
+        ctx.strokeText(txt, cx, cy);
+      }
+      ctx.fillStyle = hexToRgba(color, zlo * alpha);
+      ctx.fillText(txt, cx, cy);
       ctx.letterSpacing = "0px";
     }
   }
@@ -10049,6 +10151,10 @@ function lerpColor(c1, c2, t) {
     Math.round(b1 + (b2 - b1) * t)
   );
 }
+function themeOutlineColor() {
+  const isDark = document.body.classList.contains("theme-dark");
+  return isDark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.7)";
+}
 function hashStr(s) {
   let h = 0;
   for (let i = 0; i < s.length; i++)
@@ -10104,6 +10210,8 @@ var ChorographiaView = class extends import_obsidian6.ItemView {
     // color maps
     this.folderColorMap = /* @__PURE__ */ new Map();
     this.catColorMap = /* @__PURE__ */ new Map();
+    this.activeFolderFilters = /* @__PURE__ */ new Set();
+    this.activeTagFilters = /* @__PURE__ */ new Set();
     this.plugin = plugin;
   }
   get theme() {
@@ -10223,6 +10331,37 @@ var ChorographiaView = class extends import_obsidian6.ItemView {
       await this.plugin.saveSettings();
       this.draw();
     });
+    this.menuPanel.createEl("div", { cls: "chorographia-menu-sep" });
+    const searchRow = this.menuPanel.createEl("div", { cls: "chorographia-menu-row chorographia-search-row" });
+    this.searchInput = searchRow.createEl("input", {
+      cls: "chorographia-search-input",
+      attr: { type: "text", placeholder: "Jump to note..." }
+    });
+    this.searchResults = this.menuPanel.createEl("div", { cls: "chorographia-search-results" });
+    this.searchInput.addEventListener("input", () => this.onSearchInput());
+    this.searchInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter")
+        this.onSearchSelect();
+      if (e.key === "Escape") {
+        this.searchInput.value = "";
+        this.searchResults.empty();
+      }
+    });
+    const zoneRow = this.menuPanel.createEl("div", { cls: "chorographia-menu-row" });
+    zoneRow.createEl("span", { text: "Zone" });
+    this.zoneJumpSelect = zoneRow.createEl("select");
+    this.zoneJumpSelect.createEl("option", { text: "\u2014", value: "" });
+    this.zoneJumpSelect.addEventListener("change", () => this.onZoneJump());
+    this.menuPanel.createEl("div", { cls: "chorographia-menu-sep" });
+    const filterHeader = this.menuPanel.createEl("div", { cls: "chorographia-menu-row" });
+    filterHeader.createEl("span", { text: "Filters", cls: "chorographia-filter-header" });
+    const filterClearBtn = filterHeader.createEl("button", { cls: "chorographia-filter-clear", text: "Clear" });
+    filterClearBtn.addEventListener("click", () => this.clearFilters());
+    this.filterPanel = this.menuPanel.createEl("div", { cls: "chorographia-filter-panel" });
+    this.menuPanel.createEl("div", { cls: "chorographia-menu-sep" });
+    const exportRow = this.menuPanel.createEl("div", { cls: "chorographia-menu-row" });
+    const exportBtn = exportRow.createEl("button", { cls: "chorographia-menu-export", text: "Export PNG" });
+    exportBtn.addEventListener("click", () => this.exportMap());
     this.menuBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       this.menuPanel.classList.toggle("is-open");
@@ -10230,6 +10369,159 @@ var ChorographiaView = class extends import_obsidian6.ItemView {
     this.canvas.addEventListener("mousedown", () => {
       this.menuPanel.classList.remove("is-open");
     }, true);
+  }
+  exportMap() {
+    this.canvas.toBlob((blob) => {
+      if (!blob) {
+        new import_obsidian6.Notice("Chorographia: Export failed.");
+        return;
+      }
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const date = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+      a.download = `chorographia-${date}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      new import_obsidian6.Notice("Chorographia: Map exported.");
+    }, "image/png");
+  }
+  onSearchInput() {
+    const query = this.searchInput.value.toLowerCase().trim();
+    this.searchResults.empty();
+    if (!query || query.length < 2)
+      return;
+    const matches = this.allPoints.filter((p) => p.title.toLowerCase().includes(query)).slice(0, 8);
+    for (const m of matches) {
+      const item = this.searchResults.createEl("div", {
+        cls: "chorographia-search-item",
+        text: m.title.length > 50 ? m.title.slice(0, 47) + "..." : m.title
+      });
+      item.addEventListener("click", () => {
+        this.zoom = 8;
+        this.animateTo(m.x, m.y);
+        this.searchInput.value = "";
+        this.searchResults.empty();
+        this.menuPanel.classList.remove("is-open");
+      });
+    }
+  }
+  onSearchSelect() {
+    const first = this.searchResults.querySelector(".chorographia-search-item");
+    if (first)
+      first.click();
+  }
+  onZoneJump() {
+    const val = this.zoneJumpSelect.value;
+    if (!val)
+      return;
+    const idx = parseInt(val, 10);
+    const zone = this.zones[idx];
+    if (!zone)
+      return;
+    const blob = zone.blob;
+    if (blob.length === 0)
+      return;
+    const cx = blob.reduce((s, p) => s + p.x, 0) / blob.length;
+    const cy = blob.reduce((s, p) => s + p.y, 0) / blob.length;
+    this.zoom = 3;
+    this.animateTo(cx, cy);
+    this.zoneJumpSelect.value = "";
+    this.menuPanel.classList.remove("is-open");
+  }
+  updateZoneJumpOptions() {
+    while (this.zoneJumpSelect.options.length > 1) {
+      this.zoneJumpSelect.remove(1);
+    }
+    for (let i = 0; i < this.zones.length; i++) {
+      this.zoneJumpSelect.createEl("option", {
+        text: this.zones[i].label || `Zone ${i + 1}`,
+        value: String(i)
+      });
+    }
+  }
+  buildFilterUI() {
+    this.filterPanel.empty();
+    const folders = /* @__PURE__ */ new Set();
+    const tags = /* @__PURE__ */ new Set();
+    for (const p of this.allPoints) {
+      if (p.folder)
+        folders.add(p.folder);
+      for (const t of p.tags)
+        tags.add(t);
+    }
+    if (folders.size === 0 && tags.size === 0) {
+      this.filterPanel.createEl("span", {
+        text: "No filters available",
+        cls: "chorographia-filter-empty"
+      });
+      return;
+    }
+    if (folders.size > 0) {
+      const folderSection = this.filterPanel.createEl("div", { cls: "chorographia-filter-section" });
+      folderSection.createEl("span", { text: "Folders", cls: "chorographia-filter-title" });
+      const folderList = folderSection.createEl("div", { cls: "chorographia-filter-list" });
+      for (const f of [...folders].sort()) {
+        const lbl = folderList.createEl("label", { cls: "chorographia-filter-item" });
+        const cb = lbl.createEl("input", { type: "checkbox" });
+        cb.checked = !this.activeFolderFilters.has(f);
+        lbl.appendText(` ${f}`);
+        cb.addEventListener("change", () => {
+          if (cb.checked) {
+            this.activeFolderFilters.delete(f);
+          } else {
+            this.activeFolderFilters.add(f);
+          }
+          this.applyFilters();
+        });
+      }
+    }
+    if (tags.size > 0) {
+      const tagSection = this.filterPanel.createEl("div", { cls: "chorographia-filter-section" });
+      tagSection.createEl("span", { text: "Tags", cls: "chorographia-filter-title" });
+      const tagList = tagSection.createEl("div", { cls: "chorographia-filter-list" });
+      for (const t of [...tags].sort()) {
+        const lbl = tagList.createEl("label", { cls: "chorographia-filter-item" });
+        const cb = lbl.createEl("input", { type: "checkbox" });
+        cb.checked = !this.activeTagFilters.has(t);
+        lbl.appendText(` #${t}`);
+        cb.addEventListener("change", () => {
+          if (cb.checked) {
+            this.activeTagFilters.delete(t);
+          } else {
+            this.activeTagFilters.add(t);
+          }
+          this.applyFilters();
+        });
+      }
+    }
+  }
+  applyFilters() {
+    const hasFolderFilter = this.activeFolderFilters.size > 0;
+    const hasTagFilter = this.activeTagFilters.size > 0;
+    if (!hasFolderFilter && !hasTagFilter) {
+      this.points = this.allPoints;
+    } else {
+      this.points = this.allPoints.filter((p) => {
+        if (hasFolderFilter && this.activeFolderFilters.has(p.folder))
+          return false;
+        if (hasTagFilter && !p.tags.some((t) => this.activeTagFilters.has(t)))
+          return false;
+        return true;
+      });
+    }
+    this.updateStatus();
+    this.draw();
+  }
+  clearFilters() {
+    this.activeFolderFilters.clear();
+    this.activeTagFilters.clear();
+    this.points = this.allPoints;
+    this.buildFilterUI();
+    this.updateStatus();
+    this.draw();
   }
   // ===================== data =====================
   async loadPoints() {
@@ -10250,6 +10542,7 @@ var ChorographiaView = class extends import_obsidian6.ItemView {
         semW: n.semW ?? 3,
         noteType: n.noteType || "",
         cat: n.cat || "",
+        tags: n.tags || [],
         links: n.links || []
       };
       pts.push(p);
@@ -10269,6 +10562,9 @@ var ChorographiaView = class extends import_obsidian6.ItemView {
     } catch (e) {
       console.error("Chorographia: zone computation failed", e);
     }
+    this.updateZoneJumpOptions();
+    this.buildFilterUI();
+    this.applyFilters();
     this.draw();
   }
   async computeAndCacheZones() {
@@ -10897,13 +11193,23 @@ var ChorographiaView = class extends import_obsidian6.ItemView {
           cx /= count;
           cy /= count;
           const spt = w2sFn(cx, cy);
+          const zls = this.plugin.settings.zoneLabelSize;
+          const zlo = this.plugin.settings.zoneLabelOpacity;
           ctx.save();
-          ctx.font = "600 9px var(--font-interface)";
+          ctx.font = `600 ${zls}px var(--font-interface)`;
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
           ctx.letterSpacing = "1.5px";
-          ctx.fillStyle = `rgba(${hexToRgb(zone.color).join(",")},${0.5 * globalZoneAlpha})`;
-          ctx.fillText(zone.label.toUpperCase(), spt.x, spt.y);
+          const txt = zone.label.toUpperCase();
+          if (this.plugin.settings.labelOutline) {
+            ctx.strokeStyle = themeOutlineColor();
+            ctx.lineWidth = this.plugin.settings.labelOutlineWidth;
+            ctx.lineJoin = "round";
+            ctx.globalAlpha = zlo * globalZoneAlpha;
+            ctx.strokeText(txt, spt.x, spt.y);
+          }
+          ctx.fillStyle = `rgba(${hexToRgb(zone.color).join(",")},${zlo * globalZoneAlpha})`;
+          ctx.fillText(txt, spt.x, spt.y);
           ctx.letterSpacing = "0px";
           ctx.restore();
         }
@@ -10935,13 +11241,21 @@ var ChorographiaView = class extends import_obsidian6.ItemView {
               cx /= count;
               cy /= count;
               const spt = w2sFn(cx, cy);
+              const subSize = Math.max(5, this.plugin.settings.zoneLabelSize - 2);
               ctx.save();
-              ctx.font = "7px var(--font-interface)";
+              ctx.font = `${subSize}px var(--font-interface)`;
               ctx.textAlign = "center";
               ctx.textBaseline = "middle";
-              ctx.fillStyle = `rgba(${hexToRgb(zone.color).join(",")},${0.4 * subAlpha})`;
               ctx.translate(spt.x, spt.y);
               ctx.transform(1, 0, -0.21, 1, 0, 0);
+              if (this.plugin.settings.labelOutline) {
+                ctx.strokeStyle = themeOutlineColor();
+                ctx.lineWidth = this.plugin.settings.labelOutlineWidth;
+                ctx.lineJoin = "round";
+                ctx.globalAlpha = 0.4 * subAlpha;
+                ctx.strokeText(sz.label, 0, 0);
+              }
+              ctx.fillStyle = `rgba(${hexToRgb(zone.color).join(",")},${0.4 * subAlpha})`;
               ctx.fillText(sz.label, 0, 0);
               ctx.restore();
             }
@@ -10965,21 +11279,35 @@ var ChorographiaView = class extends import_obsidian6.ItemView {
             cx /= memberZones.length;
             cy /= memberZones.length;
             const spt = w2sFn(cx, cy);
+            const contSize = Math.round(this.plugin.settings.zoneLabelSize * 1.5);
             ctx.save();
             ctx.globalAlpha = continentLabelAlpha;
-            ctx.font = "bold 14px var(--font-interface)";
+            ctx.font = `bold ${contSize}px var(--font-interface)`;
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
             ctx.letterSpacing = "3px";
+            const contTxt = continent.label.toUpperCase();
+            if (this.plugin.settings.labelOutline) {
+              ctx.strokeStyle = isDarkTheme ? "rgba(0,0,0,0.5)" : "rgba(255,255,255,0.5)";
+              ctx.lineWidth = this.plugin.settings.labelOutlineWidth + 1;
+              ctx.lineJoin = "round";
+              ctx.strokeText(contTxt, spt.x, spt.y - 20);
+            }
             ctx.fillStyle = isDarkTheme ? "rgba(200,220,255,0.4)" : "rgba(40,60,100,0.4)";
-            ctx.fillText(continent.label.toUpperCase(), spt.x, spt.y - 20);
+            ctx.fillText(contTxt, spt.x, spt.y - 20);
             ctx.letterSpacing = "0px";
             ctx.restore();
           }
         }
       } else {
+        const lcfg = {
+          zoneLabelSize: this.plugin.settings.zoneLabelSize,
+          zoneLabelOpacity: this.plugin.settings.zoneLabelOpacity,
+          labelOutline: this.plugin.settings.labelOutline,
+          labelOutlineWidth: this.plugin.settings.labelOutlineWidth
+        };
         for (const zone of this.zones) {
-          drawZone(ctx, zone, w2sFn, globalZoneAlpha, false, isWorldmap, false, void 0, parentFillFade);
+          drawZone(ctx, zone, w2sFn, globalZoneAlpha, false, isWorldmap, false, void 0, parentFillFade, lcfg);
         }
         if (subAlpha > 0.01) {
           for (const zone of this.zones) {
@@ -10991,7 +11319,7 @@ var ChorographiaView = class extends import_obsidian6.ItemView {
               return lerpColor(zone.color, "#FFFFFF", 0.15 + t * 0.35);
             });
             for (let si = 0; si < subZones.length; si++) {
-              drawZone(ctx, subZones[si], w2sFn, subAlpha, true, false, false, shades[si]);
+              drawZone(ctx, subZones[si], w2sFn, subAlpha, true, false, false, shades[si], 1, lcfg);
             }
           }
         }
@@ -11082,7 +11410,7 @@ var ChorographiaView = class extends import_obsidian6.ItemView {
       ctx.lineWidth = 1.5;
       ctx.stroke();
     }
-    const labelAlpha = Math.min(1, Math.max(0, (zoom - 5) / 3));
+    const labelAlpha = Math.min(1, Math.max(0, (zoom - 5) / 3)) * this.plugin.settings.noteTitleOpacity;
     if (labelAlpha > 0.01 && this.plugin.settings.showNoteTitles)
       this.drawGlobalLabels(ctx, pts, scr, labelAlpha, W, H);
     if (zoom > 1.2 && this.plugin.settings.minimapCorner !== "off") {
@@ -11115,16 +11443,27 @@ var ChorographiaView = class extends import_obsidian6.ItemView {
   }
   // ---------- labels ----------
   drawGlobalLabels(ctx, pts, scr, alpha, W, H) {
+    const nts = this.plugin.settings.noteTitleSize;
+    const isDark = document.body.classList.contains("theme-dark");
+    const outlineOn = this.plugin.settings.labelOutline;
+    const outlineW = this.plugin.settings.labelOutlineWidth;
     ctx.save();
     ctx.globalAlpha = alpha;
-    ctx.font = "5px var(--font-interface)";
+    ctx.font = `${nts}px var(--font-interface)`;
     ctx.fillStyle = this.theme.text;
     ctx.textAlign = "left";
+    if (outlineOn) {
+      ctx.strokeStyle = isDark ? "rgba(10,14,26,0.9)" : "rgba(248,248,255,0.9)";
+      ctx.lineWidth = outlineW;
+      ctx.lineJoin = "round";
+    }
     for (let i = 0; i < pts.length; i++) {
       const s = scr[i];
       if (s.x < -50 || s.x > W + 50 || s.y < -50 || s.y > H + 50)
         continue;
       const t = pts[i].title.length > 40 ? pts[i].title.slice(0, 37) + "..." : pts[i].title;
+      if (outlineOn)
+        ctx.strokeText(t, s.x + 4, s.y + 2);
       ctx.fillText(t, s.x + 4, s.y + 2);
     }
     ctx.restore();
@@ -11631,6 +11970,7 @@ var ChorographiaPlugin = class extends import_obsidian7.Plugin {
         cached.folder = note.folder;
         cached.noteType = note.noteType;
         cached.cat = note.cat;
+        cached.tags = note.tags;
         cached.links = note.links;
         continue;
       }
@@ -11679,6 +12019,7 @@ var ChorographiaPlugin = class extends import_obsidian7.Plugin {
         folder: note.folder,
         noteType: note.noteType,
         cat: note.cat,
+        tags: note.tags,
         links: note.links
       };
     }
@@ -11688,6 +12029,7 @@ var ChorographiaPlugin = class extends import_obsidian7.Plugin {
         this.cache.notes[note.path].folder = note.folder;
         this.cache.notes[note.path].noteType = note.noteType;
         this.cache.notes[note.path].cat = note.cat;
+        this.cache.notes[note.path].tags = note.tags;
         this.cache.notes[note.path].links = note.links;
       }
     }

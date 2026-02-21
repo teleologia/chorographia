@@ -6,6 +6,7 @@ export interface IndexedNote {
 	folder: string;
 	noteType: string;
 	cat: string;
+	tags: string[];
 	embedText: string;
 	sha256: string;
 	links: string[]; // resolved vault-relative paths
@@ -104,12 +105,28 @@ export async function indexVault(
 			? file.path.split("/")[0]
 			: "";
 
+		// Extract tags from frontmatter and inline #tags
+		const tags: string[] = [];
+		const fmTags = fm.tags;
+		if (Array.isArray(fmTags)) {
+			for (const t of fmTags) tags.push(String(t).replace(/^#/, ""));
+		} else if (typeof fmTags === "string" && fmTags) {
+			tags.push(fmTags.replace(/^#/, ""));
+		}
+		const inlineTagRe = /(?:^|\s)#([a-zA-Z][\w/-]*)/g;
+		let tagMatch: RegExpExecArray | null;
+		while ((tagMatch = inlineTagRe.exec(body)) !== null) {
+			tags.push(tagMatch[1]);
+		}
+		const uniqueTags = [...new Set(tags)];
+
 		results.push({
 			path: file.path,
 			title,
 			folder,
 			noteType: type,
 			cat,
+			tags: uniqueTags,
 			embedText,
 			sha256,
 			links: [...new Set(links)],

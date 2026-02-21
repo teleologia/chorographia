@@ -197,6 +197,7 @@ export default class ChorographiaPlugin extends Plugin {
 				cached.folder = note.folder;
 				cached.noteType = note.noteType;
 				cached.cat = note.cat;
+				cached.tags = note.tags;
 				cached.links = note.links;
 				continue;
 			}
@@ -253,6 +254,7 @@ export default class ChorographiaPlugin extends Plugin {
 				folder: note.folder,
 				noteType: note.noteType,
 				cat: note.cat,
+				tags: note.tags,
 				links: note.links,
 			};
 		}
@@ -264,6 +266,7 @@ export default class ChorographiaPlugin extends Plugin {
 				this.cache.notes[note.path].folder = note.folder;
 				this.cache.notes[note.path].noteType = note.noteType;
 				this.cache.notes[note.path].cat = note.cat;
+				this.cache.notes[note.path].tags = note.tags;
 				this.cache.notes[note.path].links = note.links;
 			}
 		}

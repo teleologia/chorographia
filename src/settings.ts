@@ -33,6 +33,12 @@ export interface ChorographiaSettings {
 	mapLocked: boolean;
 	showSubZones: boolean;
 	showNoteTitles: boolean;
+	zoneLabelSize: number;
+	zoneLabelOpacity: number;
+	noteTitleSize: number;
+	noteTitleOpacity: number;
+	labelOutline: boolean;
+	labelOutlineWidth: number;
 }
 
 export const DEFAULT_SETTINGS: ChorographiaSettings = {
@@ -63,6 +69,12 @@ export const DEFAULT_SETTINGS: ChorographiaSettings = {
 	mapLocked: false,
 	showSubZones: true,
 	showNoteTitles: true,
+	zoneLabelSize: 9,
+	zoneLabelOpacity: 0.5,
+	noteTitleSize: 5,
+	noteTitleOpacity: 1.0,
+	labelOutline: true,
+	labelOutlineWidth: 2,
 };
 
 export class ChorographiaSettingTab extends PluginSettingTab {
@@ -491,6 +503,104 @@ export class ChorographiaSettingTab extends PluginSettingTab {
 						this.plugin.refreshMapViews();
 					})
 			);
+
+		// ======== Label Appearance ========
+		containerEl.createEl("h3", { text: "Label Appearance" });
+		containerEl.createEl("p", {
+			text: "Control the size, opacity, and contrast of zone and note labels on the map.",
+			cls: "setting-item-description",
+		});
+
+		new Setting(containerEl)
+			.setName("Zone label size")
+			.setDesc("Font size for zone name labels (px).")
+			.addSlider((sl) =>
+				sl
+					.setLimits(6, 18, 1)
+					.setValue(this.plugin.settings.zoneLabelSize)
+					.setDynamicTooltip()
+					.onChange(async (value) => {
+						this.plugin.settings.zoneLabelSize = value;
+						await this.plugin.saveSettings();
+						this.plugin.refreshMapViews();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("Zone label opacity")
+			.setDesc("Opacity of zone name labels.")
+			.addSlider((sl) =>
+				sl
+					.setLimits(0.1, 1.0, 0.05)
+					.setValue(this.plugin.settings.zoneLabelOpacity)
+					.setDynamicTooltip()
+					.onChange(async (value) => {
+						this.plugin.settings.zoneLabelOpacity = value;
+						await this.plugin.saveSettings();
+						this.plugin.refreshMapViews();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("Note title size")
+			.setDesc("Font size for note title labels (px).")
+			.addSlider((sl) =>
+				sl
+					.setLimits(3, 12, 1)
+					.setValue(this.plugin.settings.noteTitleSize)
+					.setDynamicTooltip()
+					.onChange(async (value) => {
+						this.plugin.settings.noteTitleSize = value;
+						await this.plugin.saveSettings();
+						this.plugin.refreshMapViews();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("Note title opacity")
+			.setDesc("Opacity of note title labels when zoomed in.")
+			.addSlider((sl) =>
+				sl
+					.setLimits(0.1, 1.0, 0.05)
+					.setValue(this.plugin.settings.noteTitleOpacity)
+					.setDynamicTooltip()
+					.onChange(async (value) => {
+						this.plugin.settings.noteTitleOpacity = value;
+						await this.plugin.saveSettings();
+						this.plugin.refreshMapViews();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("Label outline")
+			.setDesc("Add a contrasting outline behind labels for readability.")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.labelOutline)
+					.onChange(async (value) => {
+						this.plugin.settings.labelOutline = value;
+						await this.plugin.saveSettings();
+						this.display();
+						this.plugin.refreshMapViews();
+					})
+			);
+
+		if (this.plugin.settings.labelOutline) {
+			new Setting(containerEl)
+				.setName("Outline width")
+				.setDesc("Thickness of the label outline (px).")
+				.addSlider((sl) =>
+					sl
+						.setLimits(1, 4, 0.5)
+						.setValue(this.plugin.settings.labelOutlineWidth)
+						.setDynamicTooltip()
+						.onChange(async (value) => {
+							this.plugin.settings.labelOutlineWidth = value;
+							await this.plugin.saveSettings();
+							this.plugin.refreshMapViews();
+						})
+				);
+		}
 
 		// ======== Actions ========
 		containerEl.createEl("h3", { text: "Actions" });
