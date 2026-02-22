@@ -608,17 +608,16 @@ export class ChorographiaSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName("Re-embed changed notes")
 			.setDesc("Index notes and compute embeddings for new/changed notes.")
-			.addButton((btn) =>
-				btn.setButtonText("Run").onClick(async () => {
-					btn.setDisabled(true);
-					btn.setButtonText("Running...");
-					try {
-						await this.plugin.runEmbedPipeline();
-						new Notice("Chorographia: Embedding complete.");
-					} catch (e: any) {
-						new Notice("Chorographia: " + e.message);
-					}
-					btn.setDisabled(false);
+				.addButton((btn) =>
+					btn.setButtonText("Run").onClick(async () => {
+						btn.setDisabled(true);
+						btn.setButtonText("Running...");
+						try {
+							await this.plugin.runEmbedPipeline();
+						} catch (e: any) {
+							new Notice("Chorographia: " + e.message);
+						}
+						btn.setDisabled(false);
 					btn.setButtonText("Run");
 				})
 			);
