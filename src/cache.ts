@@ -33,6 +33,8 @@ export interface PluginCache {
 	lockedCentroids?: string[];    // base64-encoded Float32Array centroids from last full k-means
 	lockedLabels?: Record<number, string>;
 	lockedSubLabels?: Record<number, Record<number, string>>;
+	userLabelOverrides?: Record<number, string>;
+	userSubLabelOverrides?: Record<number, Record<number, string>>;
 }
 
 export function encodeFloat32(arr: Float32Array): string {

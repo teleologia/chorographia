@@ -2,12 +2,6 @@ import { computeVoronoiCells, clipConvexPolygons, fractalDisplace, isEdgeOnBound
 import type { Bounds } from "./voronoi";
 import { runWorldMapPipeline } from "./worldmap";
 
-const SEM_PALETTE = [
-	"#00D6FF", "#B9FF00", "#FF7A00", "#A855F7",
-	"#00FFB3", "#FF3DB8", "#00FFA3", "#FFD400",
-	"#00F5D4", "#FF9A3D", "#7CFFCB", "#B8C0FF",
-];
-
 export interface Zone {
 	id: number;
 	label: string;
@@ -158,7 +152,7 @@ function autoLabel(points: MapPointLike[]): string {
 
 // ---------- main export ----------
 
-export function computeZones(points: MapPointLike[], assignments: number[], k: number): Zone[] {
+export function computeZones(points: MapPointLike[], assignments: number[], k: number, palette?: string[]): Zone[] {
 	// Group points by cluster
 	const groups = new Map<number, MapPointLike[]>();
 	for (let i = 0; i < points.length; i++) {
@@ -195,10 +189,11 @@ export function computeZones(points: MapPointLike[], assignments: number[], k: n
 		// Chaikin subdivision — 3 passes for smooth natural curves
 		const blob = chaikinSubdivide(scaled, 3);
 
+		const pal = palette || ["#8E9AAF"];
 		zones.push({
 			id,
 			label: autoLabel(members),
-			color: SEM_PALETTE[id % SEM_PALETTE.length],
+			color: pal[id % pal.length],
 			memberPaths: members.map((m) => m.path),
 			hull: scaled,
 			blob,
@@ -252,8 +247,9 @@ export function computeWorldMapZones(
 	k: number,
 	subCentroidsByCluster?: Map<number, { x: number; y: number }[]>,
 	wmSettings?: WorldMapSettings,
+	palette?: string[],
 ): WorldMapResult {
-	return runWorldMapPipeline(points, assignments, k, subCentroidsByCluster, wmSettings);
+	return runWorldMapPipeline(points, assignments, k, subCentroidsByCluster, wmSettings, palette);
 }
 
 export function computeWorldMapSubZones(
@@ -261,6 +257,7 @@ export function computeWorldMapSubZones(
 	points: MapPointLike[],
 	assignments: number[],
 	localK: number,
+	palette?: string[],
 ): Zone[] {
 	// Group points by sub-cluster
 	const groups = new Map<number, MapPointLike[]>();
@@ -326,10 +323,11 @@ export function computeWorldMapSubZones(
 		// Fractal all edges — canvas-clip handles the visual boundary
 		const blob = fractalDisplace(clipped, 4, amplitude);
 
+		const pal = palette || ["#8E9AAF"];
 		zones.push({
 			id,
 			label: autoLabel(members),
-			color: SEM_PALETTE[id % SEM_PALETTE.length],
+			color: pal[id % pal.length],
 			memberPaths: members.map((m) => m.path),
 			hull: clipped,
 			blob,
@@ -438,9 +436,10 @@ function drawItalicText(
 	ctx: CanvasRenderingContext2D,
 	text: string, x: number, y: number,
 	fillStyle: string, size: number,
+	fontFamily = "var(--font-interface)",
 ) {
 	ctx.save();
-	ctx.font = `${size}px var(--font-interface)`;
+	ctx.font = `${size}px ${fontFamily}`;
 	ctx.textAlign = "center";
 	ctx.textBaseline = "middle";
 	ctx.fillStyle = fillStyle;
@@ -456,6 +455,8 @@ export interface LabelConfig {
 	zoneLabelOpacity: number;
 	labelOutline: boolean;
 	labelOutlineWidth: number;
+	fontFamily?: string;
+	fontWeight?: string;
 }
 
 function contrastOutline(): string {
@@ -539,11 +540,14 @@ export function drawZone(
 		const outline = labelCfg?.labelOutline ?? false;
 		const outlineW = labelCfg?.labelOutlineWidth ?? 2;
 
+			const ff = labelCfg?.fontFamily || "var(--font-interface)";
+		const fw = labelCfg?.fontWeight || "600";
+
 		if (isSubZone) {
 			const subSize = Math.max(5, zls - 2);
 			if (outline) {
 				ctx.save();
-				ctx.font = `${subSize}px var(--font-interface)`;
+				ctx.font = `${subSize}px ${ff}`;
 				ctx.textAlign = "center";
 				ctx.textBaseline = "middle";
 				ctx.strokeStyle = contrastOutline();
@@ -555,9 +559,9 @@ export function drawZone(
 				ctx.strokeText(zone.label, 0, 0);
 				ctx.restore();
 			}
-			drawItalicText(ctx, zone.label, cx, cy, hexToRgba(color, 0.4 * alpha), subSize);
+			drawItalicText(ctx, zone.label, cx, cy, hexToRgba(color, 0.4 * alpha), subSize, ff);
 		} else {
-			ctx.font = `600 ${zls}px var(--font-interface)`;
+			ctx.font = `${fw} ${zls}px ${ff}`;
 			ctx.textAlign = "center";
 			ctx.textBaseline = "middle";
 			ctx.letterSpacing = "1.5px";
@@ -598,11 +602,14 @@ export function drawZoneLabel(
 	const outline = labelCfg?.labelOutline ?? false;
 	const outlineW = labelCfg?.labelOutlineWidth ?? 2;
 
+	const ff = labelCfg?.fontFamily || "var(--font-interface)";
+	const fw = labelCfg?.fontWeight || "600";
+
 	ctx.save();
 	if (parentColor) {
 		const subSize = Math.max(5, zls - 2);
 		if (outline) {
-			ctx.font = `${subSize}px var(--font-interface)`;
+			ctx.font = `${subSize}px ${ff}`;
 			ctx.textAlign = "center";
 			ctx.textBaseline = "middle";
 			ctx.strokeStyle = contrastOutline();
@@ -614,9 +621,9 @@ export function drawZoneLabel(
 			ctx.strokeText(zone.label, 0, 0);
 			ctx.setTransform(1, 0, 0, 1, 0, 0);
 		}
-		drawItalicText(ctx, zone.label, cx, cy, hexToRgba(color, 0.4 * alpha), subSize);
+		drawItalicText(ctx, zone.label, cx, cy, hexToRgba(color, 0.4 * alpha), subSize, ff);
 	} else {
-		ctx.font = `600 ${zls}px var(--font-interface)`;
+		ctx.font = `${fw} ${zls}px ${ff}`;
 		ctx.textAlign = "center";
 		ctx.textBaseline = "middle";
 		ctx.letterSpacing = "1.5px";

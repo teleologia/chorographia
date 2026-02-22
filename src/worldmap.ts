@@ -58,11 +58,7 @@ interface MapPointLike {
 	cat: string;
 }
 
-const SEM_PALETTE = [
-	"#00D6FF", "#B9FF00", "#FF7A00", "#A855F7",
-	"#00FFB3", "#FF3DB8", "#00FFA3", "#FFD400",
-	"#00F5D4", "#FF9A3D", "#7CFFCB", "#B8C0FF",
-];
+// palette is now passed in from the active theme
 
 function autoLabel(points: MapPointLike[]): string {
 	const counts = new Map<string, number>();
@@ -800,6 +796,7 @@ function assembleResult(
 	memberPathsByCluster: Map<number, MapPointLike[]>,
 	borderEdges: BorderEdge[],
 	dataRange: number,
+	palette?: string[],
 ): WorldMapResult {
 	const zones: Zone[] = [];
 
@@ -836,7 +833,7 @@ function assembleResult(
 		zones.push({
 			id: clusterId,
 			label: autoLabel(members),
-			color: SEM_PALETTE[clusterId % SEM_PALETTE.length],
+			color: (palette || ["#8E9AAF"])[clusterId % (palette || ["#8E9AAF"]).length],
 			memberPaths: members.map((m) => m.path),
 			hull,
 			blob,
@@ -966,6 +963,7 @@ export function runWorldMapPipeline(
 	k: number,
 	subCentroidsByCluster?: Map<number, Point2D[]>,
 	wmSettings?: WorldMapSettings,
+	palette?: string[],
 ): WorldMapResult {
 	const groups = new Map<number, MapPointLike[]>();
 	for (let i = 0; i < dataPoints.length; i++) {
@@ -1048,6 +1046,6 @@ export function runWorldMapPipeline(
 	return assembleResult(
 		mesh, cellAssignments, isLand, subDomains,
 		clusterIds, memberPathsByCluster,
-		borderEdges, dataRange,
+		borderEdges, dataRange, palette,
 	);
 }

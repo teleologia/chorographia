@@ -1,5 +1,6 @@
 import { App, PluginSettingTab, Setting, Notice } from "obsidian";
 import type ChorographiaPlugin from "./main";
+import { BUILTIN_THEMES } from "./theme";
 
 export type ColorMode = "semantic" | "folder" | "type" | "cat";
 
@@ -35,10 +36,13 @@ export interface ChorographiaSettings {
 	showNoteTitles: boolean;
 	zoneLabelSize: number;
 	zoneLabelOpacity: number;
+	subZoneLabelSize: number;
+	subZoneLabelOpacity: number;
 	noteTitleSize: number;
 	noteTitleOpacity: number;
 	labelOutline: boolean;
 	labelOutlineWidth: number;
+	activeTheme: string;
 }
 
 export const DEFAULT_SETTINGS: ChorographiaSettings = {
@@ -71,10 +75,13 @@ export const DEFAULT_SETTINGS: ChorographiaSettings = {
 	showNoteTitles: true,
 	zoneLabelSize: 9,
 	zoneLabelOpacity: 0.5,
+	subZoneLabelSize: 7,
+	subZoneLabelOpacity: 0.4,
 	noteTitleSize: 5,
 	noteTitleOpacity: 1.0,
 	labelOutline: true,
 	labelOutlineWidth: 2,
+	activeTheme: "default",
 };
 
 export class ChorographiaSettingTab extends PluginSettingTab {
@@ -445,6 +452,19 @@ export class ChorographiaSettingTab extends PluginSettingTab {
 		});
 
 		new Setting(containerEl)
+			.setName("Theme")
+			.setDesc("Visual theme for palette, fonts, and decorative elements.")
+			.addDropdown((dd) => {
+				for (const t of BUILTIN_THEMES) dd.addOption(t.id, t.name);
+				dd.setValue(this.plugin.settings.activeTheme);
+				dd.onChange(async (value) => {
+					this.plugin.settings.activeTheme = value;
+					await this.plugin.saveSettings();
+					this.plugin.refreshMapViews();
+				});
+			});
+
+		new Setting(containerEl)
 			.setName("Color mode")
 			.setDesc("How to color points on the map.")
 			.addDropdown((dd) =>
@@ -536,6 +556,36 @@ export class ChorographiaSettingTab extends PluginSettingTab {
 					.setDynamicTooltip()
 					.onChange(async (value) => {
 						this.plugin.settings.zoneLabelOpacity = value;
+						await this.plugin.saveSettings();
+						this.plugin.refreshMapViews();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("Sub-zone label size")
+			.setDesc("Font size for sub-zone (province) labels (px).")
+			.addSlider((sl) =>
+				sl
+					.setLimits(4, 14, 1)
+					.setValue(this.plugin.settings.subZoneLabelSize)
+					.setDynamicTooltip()
+					.onChange(async (value) => {
+						this.plugin.settings.subZoneLabelSize = value;
+						await this.plugin.saveSettings();
+						this.plugin.refreshMapViews();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("Sub-zone label opacity")
+			.setDesc("Opacity of sub-zone (province) labels.")
+			.addSlider((sl) =>
+				sl
+					.setLimits(0.1, 1.0, 0.05)
+					.setValue(this.plugin.settings.subZoneLabelOpacity)
+					.setDynamicTooltip()
+					.onChange(async (value) => {
+						this.plugin.settings.subZoneLabelOpacity = value;
 						await this.plugin.saveSettings();
 						this.plugin.refreshMapViews();
 					})

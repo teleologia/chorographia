@@ -3,7 +3,7 @@
 	width: 100%;
 	height: 100%;
 	overflow: hidden;
-	background: linear-gradient(135deg, #07070f 0%, #0f0f1a 50%, #1a1a2e 100%);
+	background: var(--chorographia-bg, linear-gradient(135deg, #07070f 0%, #0f0f1a 50%, #1a1a2e 100%));
 }
 
 /* Prevent scrollbars in the Obsidian view pane */
@@ -38,12 +38,19 @@
 	font-family: var(--font-monospace);
 }
 
-/* ========== Pullout menu ========== */
+/* ========== Icon bar ========== */
 
-.chorographia-menu-btn {
+.chorographia-icon-bar {
 	position: absolute;
 	top: 12px;
 	right: 12px;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	z-index: 11;
+}
+
+.chorographia-icon-btn {
 	width: 32px;
 	height: 32px;
 	display: flex;
@@ -55,27 +62,28 @@
 	border: 1px solid rgba(44, 44, 58, 0.6);
 	border-radius: 6px;
 	cursor: pointer;
-	z-index: 11;
 	transition: background 0.15s;
 }
 
-.chorographia-menu-btn:hover {
+.chorographia-icon-btn:hover {
 	background: rgba(30, 30, 50, 0.95);
 }
 
-.chorographia-menu-btn svg {
+.chorographia-icon-btn svg {
 	width: 16px;
 	height: 16px;
 }
 
+/* ========== Panels (shared base) ========== */
+
 .chorographia-menu {
 	position: absolute;
-	top: 50px;
-	right: 12px;
+	top: 12px;
+	right: 56px;
 	display: none;
 	flex-direction: column;
 	gap: 6px;
-	padding: 8px 12px;
+	padding: 10px 14px;
 	font-size: 11px;
 	color: #D6D6E0;
 	background: rgba(15, 15, 26, 0.92);
@@ -83,11 +91,37 @@
 	border-radius: 6px;
 	font-family: var(--font-interface);
 	z-index: 10;
-	min-width: 140px;
+	min-width: 160px;
+	max-height: calc(100% - 24px);
+	overflow-y: auto;
 }
 
 .chorographia-menu.is-open {
 	display: flex;
+}
+
+.chorographia-snapshot-panel {
+	min-width: 280px;
+}
+
+.chorographia-export-panel {
+	min-width: 280px;
+}
+
+.chorographia-panel-heading {
+	font-weight: 600;
+	font-size: 10px;
+	text-transform: uppercase;
+	letter-spacing: 1px;
+	opacity: 0.6;
+	margin-bottom: 2px;
+}
+
+.chorographia-panel-subheading {
+	font-size: 10px;
+	opacity: 0.5;
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
 }
 
 .chorographia-menu-row {
@@ -128,52 +162,7 @@
 	margin: 2px 0;
 }
 
-.chorographia-search-row {
-	flex-direction: column;
-	align-items: stretch;
-}
-
-.chorographia-search-input {
-	width: 100%;
-	padding: 3px 6px;
-	font-size: 11px;
-	font-family: var(--font-interface);
-	color: #D6D6E0;
-	background: rgba(26, 26, 46, 0.9);
-	border: 1px solid rgba(44, 44, 58, 0.8);
-	border-radius: 4px;
-	outline: none;
-	box-sizing: border-box;
-}
-
-.chorographia-search-input::placeholder {
-	color: rgba(214, 214, 224, 0.4);
-}
-
-.chorographia-search-input:focus {
-	border-color: rgba(90, 198, 206, 0.5);
-}
-
-.chorographia-search-results {
-	display: flex;
-	flex-direction: column;
-	max-height: 160px;
-	overflow-y: auto;
-}
-
-.chorographia-search-item {
-	padding: 3px 6px;
-	font-size: 11px;
-	cursor: pointer;
-	border-radius: 3px;
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
-}
-
-.chorographia-search-item:hover {
-	background: rgba(90, 198, 206, 0.15);
-}
+/* ========== Filters ========== */
 
 .chorographia-filter-header {
 	font-weight: 600;
@@ -248,9 +237,161 @@
 	font-style: italic;
 }
 
-.chorographia-menu-export {
+/* ========== Snapshot panel ========== */
+
+.chorographia-snapshot-save-input {
 	width: 100%;
-	padding: 3px 8px;
+	padding: 6px 8px;
+	font-size: 13px;
+	font-family: var(--font-interface);
+	color: #D6D6E0;
+	background: rgba(26, 26, 46, 0.9);
+	border: 1px solid rgba(44, 44, 58, 0.8);
+	border-radius: 4px;
+	outline: none;
+	box-sizing: border-box;
+}
+
+.chorographia-snapshot-save-input::placeholder {
+	color: rgba(214, 214, 224, 0.4);
+}
+
+.chorographia-snapshot-save-input:focus {
+	border-color: rgba(90, 198, 206, 0.5);
+}
+
+.chorographia-snapshot-list {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	max-height: 240px;
+	overflow-y: auto;
+}
+
+.chorographia-snapshot-list-item {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 5px 8px;
+	border-radius: 4px;
+	cursor: pointer;
+	transition: background 0.1s;
+}
+
+.chorographia-snapshot-list-item:hover {
+	background: rgba(90, 198, 206, 0.1);
+}
+
+.chorographia-snapshot-list-item.is-confirm {
+	background: rgba(255, 80, 80, 0.15);
+}
+
+.chorographia-snapshot-list-info {
+	display: flex;
+	flex-direction: column;
+	gap: 1px;
+	min-width: 0;
+}
+
+.chorographia-snapshot-list-name {
+	font-size: 12px;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.chorographia-snapshot-list-date {
+	font-size: 10px;
+	opacity: 0.45;
+}
+
+.chorographia-snapshot-list-del {
+	flex-shrink: 0;
+	width: 22px;
+	height: 22px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 14px;
+	color: rgba(214, 214, 224, 0.4);
+	background: transparent;
+	border: none;
+	border-radius: 3px;
+	cursor: pointer;
+	padding: 0;
+	line-height: 1;
+}
+
+.chorographia-snapshot-list-del:hover {
+	color: #ff6b6b;
+	background: rgba(255, 107, 107, 0.1);
+}
+
+.is-confirm .chorographia-snapshot-list-del {
+	color: #ff6b6b;
+	font-size: 10px;
+	font-weight: 600;
+	width: auto;
+	padding: 0 4px;
+}
+
+/* ========== Export panel ========== */
+
+.chorographia-export-mode-group {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.chorographia-export-mode-item {
+	display: flex;
+	align-items: center;
+	padding: 5px 8px;
+	border-radius: 4px;
+	cursor: pointer;
+	font-size: 12px;
+	transition: background 0.1s;
+}
+
+.chorographia-export-mode-item:hover {
+	background: rgba(90, 198, 206, 0.08);
+}
+
+.chorographia-export-mode-item.is-active {
+	background: rgba(90, 198, 206, 0.15);
+}
+
+.chorographia-export-mode-item.is-active::before {
+	content: "\25cf";
+	margin-right: 6px;
+	color: #5AC6CE;
+	font-size: 8px;
+}
+
+.chorographia-export-mode-item:not(.is-active)::before {
+	content: "\25cb";
+	margin-right: 6px;
+	opacity: 0.4;
+	font-size: 8px;
+}
+
+.chorographia-export-options {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	padding-top: 4px;
+}
+
+.chorographia-export-scale-group {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin-top: 4px;
+	font-size: 11px;
+}
+
+.chorographia-export-scale-btn {
+	padding: 2px 8px;
 	font-size: 11px;
 	font-family: var(--font-interface);
 	color: #D6D6E0;
@@ -258,17 +399,94 @@
 	border: 1px solid rgba(44, 44, 58, 0.8);
 	border-radius: 4px;
 	cursor: pointer;
-	transition: background 0.15s;
+	transition: background 0.1s, border-color 0.1s;
 }
 
-.chorographia-menu-export:hover {
+.chorographia-export-scale-btn:hover {
 	background: rgba(44, 44, 58, 0.9);
+}
+
+.chorographia-export-scale-btn.is-active {
+	background: rgba(90, 198, 206, 0.2);
+	border-color: rgba(90, 198, 206, 0.5);
+	color: #5AC6CE;
+}
+
+.chorographia-export-btn-primary {
+	width: 100%;
+	padding: 6px 12px;
+	font-size: 12px;
+	font-family: var(--font-interface);
+	font-weight: 500;
+	color: #D6D6E0;
+	background: rgba(90, 198, 206, 0.15);
+	border: 1px solid rgba(90, 198, 206, 0.3);
+	border-radius: 4px;
+	cursor: pointer;
+	transition: background 0.15s;
+	margin-top: 4px;
+}
+
+.chorographia-export-btn-primary:hover {
+	background: rgba(90, 198, 206, 0.25);
+}
+
+.chorographia-export-btn-primary:disabled {
+	opacity: 0.4;
+	cursor: not-allowed;
+}
+
+/* ========== Region hint overlay ========== */
+
+.chorographia-region-hint {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	padding: 8px 16px;
+	font-size: 13px;
+	font-family: var(--font-interface);
+	color: #D6D6E0;
+	background: rgba(15, 15, 26, 0.85);
+	border: 1px solid rgba(90, 198, 206, 0.3);
+	border-radius: 6px;
+	pointer-events: none;
+	z-index: 5;
+	animation: chorographia-hint-fade 3s forwards;
+}
+
+@keyframes chorographia-hint-fade {
+	0% { opacity: 1; }
+	70% { opacity: 1; }
+	100% { opacity: 0; }
+}
+
+/* ========== Label edit input ========== */
+
+.chorographia-label-edit {
+	position: absolute;
+	font-family: var(--font-interface);
+	font-size: 11px;
+	text-align: center;
+	background: rgba(15, 15, 26, 0.92);
+	border: 1px solid rgba(90, 198, 206, 0.5);
+	border-radius: 3px;
+	color: #D6D6E0;
+	padding: 2px 6px;
+	outline: none;
+	z-index: 20;
+}
+
+.theme-light .chorographia-label-edit {
+	background: rgba(255, 255, 255, 0.94);
+	border-color: rgba(90, 120, 180, 0.5);
+	color: #1e1e2e;
 }
 
 /* ========== Light theme overrides ========== */
 
 .theme-light .chorographia-container {
-	background: linear-gradient(135deg, #e8e8f0 0%, #f0f0f8 50%, #f8f8ff 100%);
+	background: var(--chorographia-bg, linear-gradient(135deg, #e8e8f0 0%, #f0f0f8 50%, #f8f8ff 100%));
 }
 
 .theme-light .chorographia-status {
@@ -277,13 +495,13 @@
 	border-color: rgba(160, 160, 180, 0.4);
 }
 
-.theme-light .chorographia-menu-btn {
+.theme-light .chorographia-icon-btn {
 	color: #1e1e2e;
 	background: rgba(255, 255, 255, 0.88);
 	border-color: rgba(160, 160, 180, 0.4);
 }
 
-.theme-light .chorographia-menu-btn:hover {
+.theme-light .chorographia-icon-btn:hover {
 	background: rgba(240, 240, 248, 0.95);
 }
 
@@ -299,20 +517,6 @@
 	border-color: rgba(160, 160, 180, 0.5);
 }
 
-.theme-light .chorographia-search-input {
-	color: #1e1e2e;
-	background: rgba(240, 240, 248, 0.95);
-	border-color: rgba(160, 160, 180, 0.5);
-}
-
-.theme-light .chorographia-search-input::placeholder {
-	color: rgba(30, 30, 46, 0.35);
-}
-
-.theme-light .chorographia-search-item:hover {
-	background: rgba(90, 198, 206, 0.12);
-}
-
 .theme-light .chorographia-filter-clear {
 	color: rgba(30, 30, 46, 0.5);
 	border-color: rgba(160, 160, 180, 0.4);
@@ -326,12 +530,61 @@
 	border-color: rgba(160, 160, 180, 0.3);
 }
 
-.theme-light .chorographia-menu-export {
+.theme-light .chorographia-snapshot-save-input {
 	color: #1e1e2e;
 	background: rgba(240, 240, 248, 0.95);
 	border-color: rgba(160, 160, 180, 0.5);
 }
 
-.theme-light .chorographia-menu-export:hover {
+.theme-light .chorographia-snapshot-save-input::placeholder {
+	color: rgba(30, 30, 46, 0.35);
+}
+
+.theme-light .chorographia-snapshot-list-item:hover {
+	background: rgba(90, 198, 206, 0.08);
+}
+
+.theme-light .chorographia-snapshot-list-del:hover {
+	color: #e04040;
+	background: rgba(224, 64, 64, 0.08);
+}
+
+.theme-light .chorographia-export-mode-item:hover {
+	background: rgba(90, 198, 206, 0.06);
+}
+
+.theme-light .chorographia-export-mode-item.is-active {
+	background: rgba(90, 198, 206, 0.1);
+}
+
+.theme-light .chorographia-export-scale-btn {
+	color: #1e1e2e;
+	background: rgba(240, 240, 248, 0.95);
+	border-color: rgba(160, 160, 180, 0.5);
+}
+
+.theme-light .chorographia-export-scale-btn:hover {
 	background: rgba(220, 220, 235, 0.95);
+}
+
+.theme-light .chorographia-export-scale-btn.is-active {
+	background: rgba(90, 198, 206, 0.15);
+	border-color: rgba(90, 198, 206, 0.4);
+	color: #2a8a90;
+}
+
+.theme-light .chorographia-export-btn-primary {
+	color: #1e1e2e;
+	background: rgba(90, 198, 206, 0.12);
+	border-color: rgba(90, 198, 206, 0.25);
+}
+
+.theme-light .chorographia-export-btn-primary:hover {
+	background: rgba(90, 198, 206, 0.2);
+}
+
+.theme-light .chorographia-region-hint {
+	color: #1e1e2e;
+	background: rgba(255, 255, 255, 0.9);
+	border-color: rgba(90, 198, 206, 0.25);
 }

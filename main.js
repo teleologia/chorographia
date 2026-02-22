@@ -7448,6 +7448,237 @@ var import_obsidian7 = require("obsidian");
 
 // src/settings.ts
 var import_obsidian = require("obsidian");
+
+// src/theme.ts
+var DEFAULT_THEME = {
+  id: "default",
+  name: "Default",
+  readonly: true,
+  palette: {
+    semantic: [
+      "#00D6FF",
+      "#B9FF00",
+      "#FF7A00",
+      "#A855F7",
+      "#00FFB3",
+      "#FF3DB8",
+      "#00FFA3",
+      "#FFD400",
+      "#00F5D4",
+      "#FF9A3D",
+      "#7CFFCB",
+      "#B8C0FF"
+    ],
+    folder: [
+      "#8E9AAF",
+      "#C9963B",
+      "#B28DFF",
+      "#5AC6CE",
+      "#B8541A",
+      "#9AB2AF",
+      "#BCDC2B",
+      "#FF7A00",
+      "#A855F7",
+      "#00D6FF",
+      "#00FFB3",
+      "#FF3DB8"
+    ],
+    type: {
+      SRC: "#8E9AAF",
+      LIT: "#C9963B",
+      SEED: "#B8541A",
+      EVE: "#B28DFF",
+      REV: "#9AB2AF",
+      NOTE: "#5AC6CE"
+    },
+    semSplit: { 1: 0.8, 2: 0.65, 3: 0.5, 4: 0.35, 5: 0.2 }
+  },
+  background: {
+    dark: {
+      container: "linear-gradient(135deg, #07070f 0%, #0f0f1a 50%, #1a1a2e 100%)",
+      ocean: "#0a0e1a"
+    },
+    light: {
+      container: "linear-gradient(135deg, #e8e8f0 0%, #f0f0f8 50%, #f8f8ff 100%)",
+      ocean: "#e8eef5"
+    }
+  },
+  fonts: {
+    zoneLabel: "var(--font-interface)",
+    zoneLabelWeight: "600",
+    subZoneLabel: "var(--font-interface)",
+    noteTitle: "var(--font-interface)",
+    continentLabel: "var(--font-interface)",
+    continentLabelWeight: "bold"
+  },
+  ui: {
+    dark: {
+      panelBg: "rgba(15,15,26,0.92)",
+      panelBorder: "rgba(44,44,58,0.6)",
+      text: "#D6D6E0",
+      textMuted: "#8E9AAF",
+      linkStroke: "rgba(214,214,224,0.18)"
+    },
+    light: {
+      panelBg: "rgba(255,255,255,0.92)",
+      panelBorder: "rgba(160,160,180,0.4)",
+      text: "#1e1e2e",
+      textMuted: "#6e6e80",
+      linkStroke: "rgba(60,60,80,0.22)"
+    }
+  },
+  borders: {
+    coast: { dark: "rgba(200,220,255,0.35)", light: "rgba(40,60,100,0.35)" },
+    coastWidth: 2,
+    coastGlow: 10,
+    border: { dark: "rgba(200,220,255,0.2)", light: "rgba(40,60,100,0.2)" },
+    borderWidth: 1,
+    province: { dark: "rgba(200,220,255,0.2)", light: "rgba(40,60,100,0.2)" },
+    provinceWidth: 0.8,
+    provinceDash: [3, 4]
+  },
+  decorative: {
+    compassRose: false,
+    compassCorner: "bottom-right",
+    compassStyle: "modern",
+    gridLines: false,
+    gridStyle: "subtle",
+    gridColor: { dark: "rgba(200,220,255,0.08)", light: "rgba(40,60,100,0.08)" },
+    gridOpacity: 0.3,
+    gridSpacing: 0.25,
+    inkWobble: false,
+    inkWobbleAmplitude: 0,
+    stippleOcean: false,
+    stippleDensity: 0,
+    coastHatch: false,
+    neatline: false,
+    routeNetwork: false
+  },
+  noteStyle: {
+    shape: "dot",
+    dotGlow: true,
+    selectionRing: "#C9963B",
+    highlightEdge: "#BCDC2B"
+  }
+};
+var CARTOGRAPHY_THEME = {
+  id: "cartography-17c",
+  name: "17th-Century Cartography",
+  readonly: true,
+  palette: {
+    // Sepia/brown monochrome — like ink on parchment
+    semantic: [
+      "#5C4833",
+      "#4A3C2A",
+      "#6B5540",
+      "#3D3028",
+      "#7A6350",
+      "#524335",
+      "#695343",
+      "#4F4030",
+      "#635040",
+      "#584838",
+      "#6E5A48",
+      "#4D3E30"
+    ],
+    folder: [
+      "#5C4833",
+      "#4A3C2A",
+      "#6B5540",
+      "#3D3028",
+      "#7A6350",
+      "#524335",
+      "#695343",
+      "#4F4030",
+      "#635040",
+      "#584838",
+      "#6E5A48",
+      "#4D3E30"
+    ],
+    type: {
+      SRC: "#5C4833",
+      LIT: "#4A3C2A",
+      SEED: "#6B5540",
+      EVE: "#3D3028",
+      REV: "#524335",
+      NOTE: "#7A6350"
+    },
+    semSplit: { 1: 0.8, 2: 0.65, 3: 0.5, 4: 0.35, 5: 0.2 }
+  },
+  background: {
+    dark: {
+      container: "linear-gradient(135deg, #1a150e 0%, #2a1f14 50%, #1e1810 100%)",
+      ocean: "#1a2030"
+    },
+    light: {
+      container: "linear-gradient(135deg, #f5e6c8 0%, #ede0c0 50%, #e8d5b0 100%)",
+      ocean: "#c8d8e8"
+    }
+  },
+  fonts: {
+    zoneLabel: "'Garamond', 'EB Garamond', 'Cormorant Garamond', 'Palatino Linotype', 'Book Antiqua', Georgia, serif",
+    zoneLabelWeight: "italic",
+    subZoneLabel: "'Garamond', 'EB Garamond', 'Cormorant Garamond', 'Palatino Linotype', 'Book Antiqua', Georgia, serif",
+    noteTitle: "'Garamond', 'EB Garamond', 'Cormorant Garamond', 'Palatino Linotype', 'Book Antiqua', Georgia, serif",
+    continentLabel: "'Garamond', 'EB Garamond', 'Cormorant Garamond', 'Palatino Linotype', 'Book Antiqua', Georgia, serif",
+    continentLabelWeight: "italic bold"
+  },
+  ui: {
+    dark: {
+      panelBg: "rgba(26,21,14,0.94)",
+      panelBorder: "rgba(139,115,85,0.4)",
+      text: "#D4C5A9",
+      textMuted: "#8B7355",
+      linkStroke: "rgba(180,160,130,0.55)"
+    },
+    light: {
+      panelBg: "rgba(245,230,200,0.94)",
+      panelBorder: "rgba(139,115,85,0.35)",
+      text: "#3a2a1a",
+      textMuted: "#8B7355",
+      linkStroke: "rgba(80,60,40,0.50)"
+    }
+  },
+  borders: {
+    coast: { dark: "rgba(180,160,120,0.45)", light: "rgba(100,80,50,0.4)" },
+    coastWidth: 2.5,
+    coastGlow: 8,
+    border: { dark: "rgba(180,160,120,0.25)", light: "rgba(100,80,50,0.25)" },
+    borderWidth: 1.2,
+    province: { dark: "rgba(180,160,120,0.15)", light: "rgba(100,80,50,0.15)" },
+    provinceWidth: 0.6,
+    provinceDash: [4, 5]
+  },
+  decorative: {
+    compassRose: true,
+    compassCorner: "bottom-right",
+    compassStyle: "cartographic",
+    gridLines: true,
+    gridStyle: "cartographic",
+    gridColor: { dark: "rgba(139,115,85,0.12)", light: "rgba(139,115,85,0.08)" },
+    gridOpacity: 0.4,
+    gridSpacing: 0.2,
+    inkWobble: true,
+    inkWobbleAmplitude: 1,
+    stippleOcean: true,
+    stippleDensity: 3e-4,
+    coastHatch: true,
+    neatline: true,
+    routeNetwork: true
+  },
+  noteStyle: {
+    shape: "terrain",
+    dotGlow: false,
+    selectionRing: "#8B7355",
+    highlightEdge: "#A0916B"
+  }
+};
+var BUILTIN_THEMES = [DEFAULT_THEME, CARTOGRAPHY_THEME];
+function getThemeById(id) {
+  return BUILTIN_THEMES.find((t) => t.id === id) || DEFAULT_THEME;
+}
+
+// src/settings.ts
 var DEFAULT_SETTINGS = {
   embeddingProvider: "ollama",
   ollamaUrl: "http://localhost:11434",
@@ -7478,10 +7709,13 @@ var DEFAULT_SETTINGS = {
   showNoteTitles: true,
   zoneLabelSize: 9,
   zoneLabelOpacity: 0.5,
+  subZoneLabelSize: 7,
+  subZoneLabelOpacity: 0.4,
   noteTitleSize: 5,
   noteTitleOpacity: 1,
   labelOutline: true,
-  labelOutlineWidth: 2
+  labelOutlineWidth: 2,
+  activeTheme: "default"
 };
 var ChorographiaSettingTab = class extends import_obsidian.PluginSettingTab {
   constructor(app, plugin) {
@@ -7695,6 +7929,16 @@ var ChorographiaSettingTab = class extends import_obsidian.PluginSettingTab {
       text: "Visual appearance of the map canvas and file explorer integration.",
       cls: "setting-item-description"
     });
+    new import_obsidian.Setting(containerEl).setName("Theme").setDesc("Visual theme for palette, fonts, and decorative elements.").addDropdown((dd) => {
+      for (const t of BUILTIN_THEMES)
+        dd.addOption(t.id, t.name);
+      dd.setValue(this.plugin.settings.activeTheme);
+      dd.onChange(async (value) => {
+        this.plugin.settings.activeTheme = value;
+        await this.plugin.saveSettings();
+        this.plugin.refreshMapViews();
+      });
+    });
     new import_obsidian.Setting(containerEl).setName("Color mode").setDesc("How to color points on the map.").addDropdown(
       (dd) => dd.addOption("semantic", "Semantic").addOption("folder", "Folder").addOption("type", "Type (frontmatter)").addOption("cat", "Category (frontmatter)").setValue(this.plugin.settings.colorMode).onChange(async (value) => {
         this.plugin.settings.colorMode = value;
@@ -7737,6 +7981,20 @@ var ChorographiaSettingTab = class extends import_obsidian.PluginSettingTab {
     new import_obsidian.Setting(containerEl).setName("Zone label opacity").setDesc("Opacity of zone name labels.").addSlider(
       (sl) => sl.setLimits(0.1, 1, 0.05).setValue(this.plugin.settings.zoneLabelOpacity).setDynamicTooltip().onChange(async (value) => {
         this.plugin.settings.zoneLabelOpacity = value;
+        await this.plugin.saveSettings();
+        this.plugin.refreshMapViews();
+      })
+    );
+    new import_obsidian.Setting(containerEl).setName("Sub-zone label size").setDesc("Font size for sub-zone (province) labels (px).").addSlider(
+      (sl) => sl.setLimits(4, 14, 1).setValue(this.plugin.settings.subZoneLabelSize).setDynamicTooltip().onChange(async (value) => {
+        this.plugin.settings.subZoneLabelSize = value;
+        await this.plugin.saveSettings();
+        this.plugin.refreshMapViews();
+      })
+    );
+    new import_obsidian.Setting(containerEl).setName("Sub-zone label opacity").setDesc("Opacity of sub-zone (province) labels.").addSlider(
+      (sl) => sl.setLimits(0.1, 1, 0.05).setValue(this.plugin.settings.subZoneLabelOpacity).setDynamicTooltip().onChange(async (value) => {
+        this.plugin.settings.subZoneLabelOpacity = value;
         await this.plugin.saveSettings();
         this.plugin.refreshMapViews();
       })
@@ -8951,20 +9209,6 @@ function convexHull(points) {
   upper.pop();
   return lower.concat(upper);
 }
-var SEM_PALETTE = [
-  "#00D6FF",
-  "#B9FF00",
-  "#FF7A00",
-  "#A855F7",
-  "#00FFB3",
-  "#FF3DB8",
-  "#00FFA3",
-  "#FFD400",
-  "#00F5D4",
-  "#FF9A3D",
-  "#7CFFCB",
-  "#B8C0FF"
-];
 function autoLabel(points) {
   const counts = /* @__PURE__ */ new Map();
   for (const p of points) {
@@ -9533,7 +9777,7 @@ function sharesEdge(v0, v1, poly, eps) {
   }
   return false;
 }
-function assembleResult(mesh, assignments, isLand, subDomains, clusterIds, memberPathsByCluster, borderEdges, dataRange) {
+function assembleResult(mesh, assignments, isLand, subDomains, clusterIds, memberPathsByCluster, borderEdges, dataRange, palette) {
   const zones = [];
   for (const clusterId of clusterIds) {
     const members = memberPathsByCluster.get(clusterId);
@@ -9563,7 +9807,7 @@ function assembleResult(mesh, assignments, isLand, subDomains, clusterIds, membe
     zones.push({
       id: clusterId,
       label: autoLabel(members),
-      color: SEM_PALETTE[clusterId % SEM_PALETTE.length],
+      color: (palette || ["#8E9AAF"])[clusterId % (palette || ["#8E9AAF"]).length],
       memberPaths: members.map((m) => m.path),
       hull,
       blob,
@@ -9659,7 +9903,7 @@ function assignSubDomains(mesh, assignments, subCentroidsByCluster) {
   }
   return subDomains;
 }
-function runWorldMapPipeline(dataPoints, clusterAssignments, k, subCentroidsByCluster, wmSettings) {
+function runWorldMapPipeline(dataPoints, clusterAssignments, k, subCentroidsByCluster, wmSettings, palette) {
   const groups = /* @__PURE__ */ new Map();
   for (let i = 0; i < dataPoints.length; i++) {
     const c = clusterAssignments[i];
@@ -9729,25 +9973,12 @@ function runWorldMapPipeline(dataPoints, clusterAssignments, k, subCentroidsByCl
     clusterIds,
     memberPathsByCluster,
     borderEdges,
-    dataRange
+    dataRange,
+    palette
   );
 }
 
 // src/zones.ts
-var SEM_PALETTE2 = [
-  "#00D6FF",
-  "#B9FF00",
-  "#FF7A00",
-  "#A855F7",
-  "#00FFB3",
-  "#FF3DB8",
-  "#00FFA3",
-  "#FFD400",
-  "#00F5D4",
-  "#FF9A3D",
-  "#7CFFCB",
-  "#B8C0FF"
-];
 function cross2(o, a, b) {
   return (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
 }
@@ -9823,7 +10054,7 @@ function autoLabel2(points) {
   }
   return best;
 }
-function computeZones(points, assignments, k) {
+function computeZones(points, assignments, k, palette) {
   const groups = /* @__PURE__ */ new Map();
   for (let i = 0; i < points.length; i++) {
     const c = assignments[i];
@@ -9852,10 +10083,11 @@ function computeZones(points, assignments, k) {
     }
     const scaled = scaleHull(hull, 1.3);
     const blob = chaikinSubdivide(scaled, 3);
+    const pal = palette || ["#8E9AAF"];
     zones.push({
       id,
       label: autoLabel2(members),
-      color: SEM_PALETTE2[id % SEM_PALETTE2.length],
+      color: pal[id % pal.length],
       memberPaths: members.map((m) => m.path),
       hull: scaled,
       blob
@@ -9863,10 +10095,10 @@ function computeZones(points, assignments, k) {
   }
   return zones;
 }
-function computeWorldMapZones(points, assignments, k, subCentroidsByCluster, wmSettings) {
-  return runWorldMapPipeline(points, assignments, k, subCentroidsByCluster, wmSettings);
+function computeWorldMapZones(points, assignments, k, subCentroidsByCluster, wmSettings, palette) {
+  return runWorldMapPipeline(points, assignments, k, subCentroidsByCluster, wmSettings, palette);
 }
-function computeWorldMapSubZones(parentHull, points, assignments, localK) {
+function computeWorldMapSubZones(parentHull, points, assignments, localK, palette) {
   const groups = /* @__PURE__ */ new Map();
   for (let i = 0; i < points.length; i++) {
     const c = assignments[i];
@@ -9924,10 +10156,11 @@ function computeWorldMapSubZones(parentHull, points, assignments, localK) {
     if (clipped.length < 3)
       continue;
     const blob = fractalDisplace(clipped, 4, amplitude);
+    const pal = palette || ["#8E9AAF"];
     zones.push({
       id,
       label: autoLabel2(members),
-      color: SEM_PALETTE2[id % SEM_PALETTE2.length],
+      color: pal[id % pal.length],
       memberPaths: members.map((m) => m.path),
       hull: clipped,
       blob
@@ -9935,9 +10168,9 @@ function computeWorldMapSubZones(parentHull, points, assignments, localK) {
   }
   return zones;
 }
-function drawItalicText(ctx, text, x, y, fillStyle, size) {
+function drawItalicText(ctx, text, x, y, fillStyle, size, fontFamily = "var(--font-interface)") {
   ctx.save();
-  ctx.font = `${size}px var(--font-interface)`;
+  ctx.font = `${size}px ${fontFamily}`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillStyle = fillStyle;
@@ -10005,11 +10238,13 @@ function drawZone(ctx, zone, w2s, alpha, dashed = false, worldmap = false, skipL
     const zlo = labelCfg?.zoneLabelOpacity ?? 0.5;
     const outline = labelCfg?.labelOutline ?? false;
     const outlineW = labelCfg?.labelOutlineWidth ?? 2;
+    const ff = labelCfg?.fontFamily || "var(--font-interface)";
+    const fw = labelCfg?.fontWeight || "600";
     if (isSubZone) {
       const subSize = Math.max(5, zls - 2);
       if (outline) {
         ctx.save();
-        ctx.font = `${subSize}px var(--font-interface)`;
+        ctx.font = `${subSize}px ${ff}`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.strokeStyle = contrastOutline();
@@ -10021,9 +10256,9 @@ function drawZone(ctx, zone, w2s, alpha, dashed = false, worldmap = false, skipL
         ctx.strokeText(zone.label, 0, 0);
         ctx.restore();
       }
-      drawItalicText(ctx, zone.label, cx, cy, hexToRgba(color, 0.4 * alpha), subSize);
+      drawItalicText(ctx, zone.label, cx, cy, hexToRgba(color, 0.4 * alpha), subSize, ff);
     } else {
-      ctx.font = `600 ${zls}px var(--font-interface)`;
+      ctx.font = `${fw} ${zls}px ${ff}`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.letterSpacing = "1.5px";
@@ -10096,45 +10331,519 @@ ${clusterDescs}`
   return result;
 }
 
+// src/ink.ts
+function mulberry326(seed) {
+  return () => {
+    seed |= 0;
+    seed = seed + 1831565813 | 0;
+    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+function hashCoords(x, y) {
+  const h = Math.round(x * 1e4) * 73856093 ^ Math.round(y * 1e4) * 19349663;
+  return Math.abs(h) >>> 0;
+}
+function wobbleLine(x0, y0, x1, y1, amplitude, segments = 6, seed = 0) {
+  const rng = mulberry326(seed);
+  const pts = [{ x: x0, y: y0 }];
+  const dx = x1 - x0, dy = y1 - y0;
+  const len = Math.sqrt(dx * dx + dy * dy);
+  if (len < 1e-3)
+    return [{ x: x0, y: y0 }, { x: x1, y: y1 }];
+  const px = -dy / len, py = dx / len;
+  for (let i = 1; i < segments; i++) {
+    const t = i / segments;
+    const disp = (rng() - 0.5) * 2 * amplitude;
+    pts.push({
+      x: x0 + dx * t + px * disp,
+      y: y0 + dy * t + py * disp
+    });
+  }
+  pts.push({ x: x1, y: y1 });
+  return pts;
+}
+function wobblePolyline(points, amplitude, seed = 0) {
+  if (points.length < 2)
+    return [...points];
+  const result = [points[0]];
+  for (let i = 0; i < points.length - 1; i++) {
+    const seg = wobbleLine(
+      points[i].x,
+      points[i].y,
+      points[i + 1].x,
+      points[i + 1].y,
+      amplitude,
+      4,
+      seed + i * 7919
+    );
+    for (let j = 1; j < seg.length; j++)
+      result.push(seg[j]);
+  }
+  return result;
+}
+function strokeWobblyLine(ctx, x0, y0, x1, y1, amplitude, baseWidth, segments = 6, seed = 0) {
+  const pts = wobbleLine(x0, y0, x1, y1, amplitude, segments, seed);
+  drawWobblyPath(ctx, pts, baseWidth, seed);
+}
+function strokeWobblyPolyline(ctx, points, amplitude, baseWidth, seed = 0) {
+  const pts = wobblePolyline(points, amplitude, seed);
+  drawWobblyPath(ctx, pts, baseWidth, seed);
+}
+function drawWobblyPath(ctx, pts, baseWidth, seed) {
+  if (pts.length < 2)
+    return;
+  const rng = mulberry326(seed + 31337);
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, pts[0].y);
+  for (let i = 1; i < pts.length; i++) {
+    ctx.lineTo(pts[i].x, pts[i].y);
+  }
+  ctx.lineWidth = baseWidth * (0.9 + rng() * 0.2);
+  ctx.stroke();
+}
+function fillStipple(ctx, x, y, w, h, density, dotRadius, color, seed = 0) {
+  const tileSize = 64;
+  ctx.fillStyle = color;
+  const tx0 = Math.floor(x / tileSize);
+  const ty0 = Math.floor(y / tileSize);
+  const tx1 = Math.ceil((x + w) / tileSize);
+  const ty1 = Math.ceil((y + h) / tileSize);
+  const dotsPerTile = Math.max(1, Math.round(density * tileSize * tileSize));
+  ctx.beginPath();
+  for (let tx = tx0; tx < tx1; tx++) {
+    for (let ty = ty0; ty < ty1; ty++) {
+      const tileSeed = hashCoords(tx + seed * 1e-3, ty + seed * 2e-3);
+      const rng = mulberry326(tileSeed);
+      for (let d = 0; d < dotsPerTile; d++) {
+        const dx = tx * tileSize + rng() * tileSize;
+        const dy = ty * tileSize + rng() * tileSize;
+        if (dx < x || dx > x + w || dy < y || dy > y + h)
+          continue;
+        ctx.moveTo(dx + dotRadius, dy);
+        ctx.arc(dx, dy, dotRadius, 0, Math.PI * 2);
+      }
+    }
+  }
+  ctx.fill();
+}
+
+// src/terrain.ts
+function distToPolygon(p, poly) {
+  if (poly.length < 3)
+    return Infinity;
+  let minD = Infinity;
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i];
+    const b = poly[(i + 1) % poly.length];
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const lenSq = dx * dx + dy * dy;
+    if (lenSq < 1e-12)
+      continue;
+    const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / lenSq));
+    const px = a.x + t * dx, py = a.y + t * dy;
+    const d = Math.sqrt((p.x - px) ** 2 + (p.y - py) ** 2);
+    if (d < minD)
+      minD = d;
+  }
+  return minD;
+}
+function isInsidePolygon(p, poly) {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    if (poly[i].y > p.y !== poly[j].y > p.y && p.x < (poly[j].x - poly[i].x) * (p.y - poly[i].y) / (poly[j].y - poly[i].y) + poly[i].x) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+function hashPoint(x, y) {
+  const h = Math.round(x * 1e4) * 73856093 ^ Math.round(y * 1e4) * 19349663;
+  return (Math.abs(h) >>> 0) % 100;
+}
+function classifyTerrain(point, continents, allPoints, localDensityRadius = 0.08) {
+  let onLand = false;
+  let coastDist = Infinity;
+  for (const c of continents) {
+    if (!c.coastline || c.coastline.length < 3)
+      continue;
+    if (isInsidePolygon(point, c.coastline)) {
+      onLand = true;
+      coastDist = Math.min(coastDist, distToPolygon(point, c.coastline));
+      break;
+    }
+    coastDist = Math.min(coastDist, distToPolygon(point, c.coastline));
+  }
+  if (!onLand)
+    return "reef";
+  if (coastDist < 0.04)
+    return "port";
+  let neighbors = 0;
+  const r2 = localDensityRadius * localDensityRadius;
+  for (const p of allPoints) {
+    const dx = p.x - point.x, dy = p.y - point.y;
+    if (dx * dx + dy * dy < r2)
+      neighbors++;
+  }
+  if (neighbors > 8)
+    return "city";
+  return hashPoint(point.x, point.y) < 50 ? "forest" : "mountain";
+}
+function classifyAll(points, continents) {
+  return points.map((p) => classifyTerrain(p, continents, points));
+}
+function drawTerrainIcon(ctx, type, x, y, size, color, alpha, wx = 0, wy = 0) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.translate(x, y);
+  const seed = hashCoords(wx, wy);
+  switch (type) {
+    case "city":
+      drawCity(ctx, size, color, seed);
+      break;
+    case "port":
+      drawPort(ctx, size, color, seed);
+      break;
+    case "forest":
+      drawForest(ctx, size, color, seed);
+      break;
+    case "mountain":
+      drawMountain(ctx, size, color, seed);
+      break;
+    case "reef":
+      drawReef(ctx, size, color, seed);
+      break;
+  }
+  ctx.restore();
+}
+function drawMountain(ctx, s, color, seed) {
+  const rng = mulberry326(seed);
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  if (s < 8) {
+    ctx.beginPath();
+    ctx.moveTo(-s * 0.4, s * 0.4);
+    ctx.lineTo(0, -s * 0.5);
+    ctx.lineTo(s * 0.4, s * 0.4);
+    ctx.stroke();
+    return;
+  }
+  const lw = Math.max(0.5, s * 0.06);
+  strokeWobblyLine(ctx, -s * 0.5, s * 0.4, 0, -s * 0.6, s * 0.04, lw, 5, seed);
+  strokeWobblyLine(ctx, 0, -s * 0.6, s * 0.5, s * 0.4, s * 0.04, lw, 5, seed + 100);
+  const p2x = -s * 0.25, p2y = -s * 0.35;
+  strokeWobblyLine(ctx, -s * 0.5, s * 0.4, p2x, p2y, s * 0.03, lw * 0.8, 4, seed + 200);
+  strokeWobblyLine(ctx, p2x, p2y, -s * 0.05, s * 0.1, s * 0.03, lw * 0.8, 4, seed + 300);
+  const hatchCount = 3 + Math.floor(rng() * 3);
+  ctx.lineWidth = lw * 0.5;
+  for (let i = 0; i < hatchCount; i++) {
+    const t = 0.2 + i / hatchCount * 0.6;
+    const hx = -s * 0.5 + (0 - -s * 0.5) * t;
+    const hy = s * 0.4 + (-s * 0.6 - s * 0.4) * t;
+    const hLen = s * 0.12 + rng() * s * 0.08;
+    strokeWobblyLine(ctx, hx, hy, hx + hLen * 0.7, hy + hLen, s * 0.02, lw * 0.5, 3, seed + 400 + i * 71);
+  }
+}
+function drawForest(ctx, s, color, seed) {
+  const rng = mulberry326(seed);
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  if (s < 8) {
+    ctx.beginPath();
+    ctx.arc(0, -s * 0.2, s * 0.3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillRect(-0.5, -s * 0.2, 1, s * 0.5);
+    return;
+  }
+  const lw = Math.max(0.5, s * 0.06);
+  const treeCount = 3 + Math.floor(rng() * 3);
+  const trees = [];
+  for (let i = 0; i < treeCount; i++) {
+    trees.push({
+      ox: (rng() - 0.5) * s * 0.7,
+      oy: (rng() - 0.3) * s * 0.3,
+      r: s * 0.15 + rng() * s * 0.1,
+      h: s * 0.2 + rng() * s * 0.15
+    });
+  }
+  trees.sort((a, b) => a.oy - b.oy);
+  for (const t of trees) {
+    strokeWobblyLine(ctx, t.ox, t.oy, t.ox, t.oy + t.h, s * 0.02, lw * 0.7, 3, seed + trees.indexOf(t) * 137);
+    ctx.beginPath();
+    const crownY = t.oy - t.r * 0.3;
+    const segments = 12;
+    for (let j = 0; j <= segments; j++) {
+      const angle = j / segments * Math.PI * 2;
+      const wobble = 1 + (mulberry326(seed + j * 31 + trees.indexOf(t) * 97)() - 0.5) * 0.2;
+      const px = t.ox + Math.cos(angle) * t.r * wobble;
+      const py = crownY + Math.sin(angle) * t.r * wobble;
+      if (j === 0)
+        ctx.moveTo(px, py);
+      else
+        ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.lineWidth = lw;
+    ctx.stroke();
+  }
+}
+function drawCity(ctx, s, color, seed) {
+  const rng = mulberry326(seed);
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  if (s < 8) {
+    ctx.beginPath();
+    ctx.moveTo(-s * 0.3, -s * 0.4);
+    ctx.lineTo(0, -s * 0.6);
+    ctx.lineTo(s * 0.3, -s * 0.4);
+    ctx.lineTo(s * 0.3, s * 0.3);
+    ctx.lineTo(-s * 0.3, s * 0.3);
+    ctx.closePath();
+    ctx.stroke();
+    return;
+  }
+  const lw = Math.max(0.5, s * 0.06);
+  const bCount = 2 + Math.floor(rng() * 2);
+  const bw = s * 0.25;
+  for (let i = 0; i < bCount; i++) {
+    const ox = (i - (bCount - 1) / 2) * bw * 1.3;
+    const bh = s * 0.3 + rng() * s * 0.25;
+    const roofH = s * 0.15 + rng() * s * 0.1;
+    const halfW = bw * 0.45;
+    const baseY = s * 0.35;
+    strokeWobblyLine(ctx, ox - halfW, baseY, ox - halfW, baseY - bh, s * 0.02, lw, 3, seed + i * 100);
+    strokeWobblyLine(ctx, ox - halfW, baseY - bh, ox, baseY - bh - roofH, s * 0.02, lw, 3, seed + i * 100 + 10);
+    strokeWobblyLine(ctx, ox, baseY - bh - roofH, ox + halfW, baseY - bh, s * 0.02, lw, 3, seed + i * 100 + 20);
+    strokeWobblyLine(ctx, ox + halfW, baseY - bh, ox + halfW, baseY, s * 0.02, lw, 3, seed + i * 100 + 30);
+    strokeWobblyLine(ctx, ox - halfW, baseY, ox + halfW, baseY, s * 0.01, lw, 3, seed + i * 100 + 40);
+  }
+  const spireX = 0;
+  const spireBase = s * 0.35 - s * 0.5;
+  const spireTop = -s * 0.75;
+  strokeWobblyLine(ctx, spireX, spireBase, spireX, spireTop, s * 0.015, lw * 0.8, 4, seed + 500);
+  const crossSize = s * 0.08;
+  strokeWobblyLine(ctx, spireX - crossSize, spireTop + crossSize, spireX + crossSize, spireTop + crossSize, s * 0.01, lw * 0.6, 3, seed + 510);
+  strokeWobblyLine(ctx, spireX, spireTop, spireX, spireTop + crossSize * 2, s * 0.01, lw * 0.6, 3, seed + 520);
+}
+function drawPort(ctx, s, color, seed) {
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  if (s < 8) {
+    ctx.beginPath();
+    ctx.moveTo(0, -s * 0.5);
+    ctx.lineTo(s * 0.3, s * 0.2);
+    ctx.lineTo(-s * 0.3, s * 0.2);
+    ctx.closePath();
+    ctx.stroke();
+    return;
+  }
+  const lw = Math.max(0.5, s * 0.06);
+  ctx.beginPath();
+  ctx.moveTo(-s * 0.4, 0);
+  ctx.quadraticCurveTo(-s * 0.35, s * 0.2, 0, s * 0.22);
+  ctx.quadraticCurveTo(s * 0.35, s * 0.2, s * 0.4, 0);
+  ctx.lineWidth = lw;
+  ctx.stroke();
+  strokeWobblyLine(ctx, 0, 0, 0, -s * 0.55, s * 0.015, lw * 0.8, 4, seed + 100);
+  ctx.beginPath();
+  ctx.moveTo(0, -s * 0.5);
+  ctx.lineTo(s * 0.3, -s * 0.1);
+  ctx.lineTo(0, -s * 0.05);
+  ctx.closePath();
+  ctx.lineWidth = lw * 0.7;
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(0, -s * 0.55);
+  ctx.lineTo(s * 0.15, -s * 0.52);
+  ctx.lineTo(0, -s * 0.48);
+  ctx.lineWidth = lw * 0.5;
+  ctx.stroke();
+  const waveY = s * 0.32;
+  for (let w = 0; w < 2; w++) {
+    const wy = waveY + w * s * 0.1;
+    const ww = s * 0.3 - w * s * 0.08;
+    ctx.beginPath();
+    ctx.moveTo(-ww, wy);
+    ctx.quadraticCurveTo(-ww * 0.5, wy - s * 0.06, 0, wy);
+    ctx.quadraticCurveTo(ww * 0.5, wy + s * 0.06, ww, wy);
+    ctx.lineWidth = lw * 0.5;
+    ctx.stroke();
+  }
+}
+function drawReef(ctx, s, color, seed) {
+  const rng = mulberry326(seed);
+  ctx.fillStyle = color;
+  if (s < 8) {
+    ctx.beginPath();
+    for (let i = 0; i < 3; i++) {
+      const dx = (rng() - 0.5) * s * 0.5, dy = (rng() - 0.5) * s * 0.5;
+      ctx.moveTo(dx + s * 0.1, dy);
+      ctx.arc(dx, dy, s * 0.1, 0, Math.PI * 2);
+    }
+    ctx.fill();
+    return;
+  }
+  const dotCount = 8 + Math.floor(rng() * 5);
+  const rx = s * 0.4, ry = s * 0.25;
+  ctx.beginPath();
+  for (let i = 0; i < dotCount; i++) {
+    let dx, dy;
+    do {
+      dx = (rng() - 0.5) * 2;
+      dy = (rng() - 0.5) * 2;
+    } while (dx * dx + dy * dy > 1);
+    const dotR = s * 0.03 + rng() * s * 0.04;
+    ctx.moveTo(dx * rx + dotR, dy * ry);
+    ctx.arc(dx * rx, dy * ry, dotR, 0, Math.PI * 2);
+  }
+  ctx.fill();
+}
+
+// src/routes.ts
+var UnionFind = class {
+  constructor(n) {
+    this.parent = Array.from({ length: n }, (_, i) => i);
+    this.rank = new Array(n).fill(0);
+  }
+  find(x) {
+    if (this.parent[x] !== x)
+      this.parent[x] = this.find(this.parent[x]);
+    return this.parent[x];
+  }
+  union(a, b) {
+    const ra = this.find(a), rb = this.find(b);
+    if (ra === rb)
+      return false;
+    if (this.rank[ra] < this.rank[rb])
+      this.parent[ra] = rb;
+    else if (this.rank[ra] > this.rank[rb])
+      this.parent[rb] = ra;
+    else {
+      this.parent[rb] = ra;
+      this.rank[ra]++;
+    }
+    return true;
+  }
+};
+function computeRouteNetwork(points, links, terrainTypes) {
+  const n = points.length;
+  if (n < 2)
+    return { edges: [], linkPaths: /* @__PURE__ */ new Map() };
+  const linkedPairs = [];
+  const pairSet = /* @__PURE__ */ new Set();
+  for (let i = 0; i < n; i++) {
+    for (const j of links[i]) {
+      if (j < 0 || j >= n || j === i)
+        continue;
+      const key = i < j ? `${i}-${j}` : `${j}-${i}`;
+      if (!pairSet.has(key)) {
+        pairSet.add(key);
+        linkedPairs.push(i < j ? [i, j] : [j, i]);
+      }
+    }
+  }
+  if (linkedPairs.length === 0)
+    return { edges: [], linkPaths: /* @__PURE__ */ new Map() };
+  const nodeSet = /* @__PURE__ */ new Set();
+  for (const [a, b] of linkedPairs) {
+    nodeSet.add(a);
+    nodeSet.add(b);
+  }
+  const nodes = [...nodeSet].sort((a, b) => a - b);
+  const nodeIdxMap = /* @__PURE__ */ new Map();
+  nodes.forEach((node, i) => nodeIdxMap.set(node, i));
+  const localN = nodes.length;
+  const allEdges = [];
+  for (let li = 0; li < localN; li++) {
+    for (let lj = li + 1; lj < localN; lj++) {
+      const gi = nodes[li], gj = nodes[lj];
+      const dx = points[gi].x - points[gj].x;
+      const dy = points[gi].y - points[gj].y;
+      allEdges.push({ a: li, b: lj, dist: Math.sqrt(dx * dx + dy * dy) });
+    }
+  }
+  allEdges.sort((a, b) => a.dist - b.dist);
+  const uf = new UnionFind(localN);
+  const mstEdges = [];
+  const adj = /* @__PURE__ */ new Map();
+  for (let i = 0; i < localN; i++)
+    adj.set(i, []);
+  for (const e of allEdges) {
+    if (uf.union(e.a, e.b)) {
+      const idx = mstEdges.length;
+      mstEdges.push({ a: e.a, b: e.b });
+      adj.get(e.a).push({ neighbor: e.b, edgeIdx: idx });
+      adj.get(e.b).push({ neighbor: e.a, edgeIdx: idx });
+      if (mstEdges.length === localN - 1)
+        break;
+    }
+  }
+  function findPath(startLocal, endLocal) {
+    if (startLocal === endLocal)
+      return [];
+    const visited = /* @__PURE__ */ new Set();
+    const queue = [{ node: startLocal, path: [] }];
+    visited.add(startLocal);
+    while (queue.length > 0) {
+      const { node, path } = queue.shift();
+      for (const { neighbor, edgeIdx } of adj.get(node) || []) {
+        if (visited.has(neighbor))
+          continue;
+        const newPath = [...path, edgeIdx];
+        if (neighbor === endLocal)
+          return newPath;
+        visited.add(neighbor);
+        queue.push({ node: neighbor, path: newPath });
+      }
+    }
+    return null;
+  }
+  const traffic = new Array(mstEdges.length).fill(0);
+  const linkPaths = /* @__PURE__ */ new Map();
+  for (const [gi, gj] of linkedPairs) {
+    const li = nodeIdxMap.get(gi);
+    const lj = nodeIdxMap.get(gj);
+    if (li == null || lj == null)
+      continue;
+    const path = findPath(li, lj);
+    if (!path)
+      continue;
+    const key = `${gi}\u2192${gj}`;
+    linkPaths.set(key, path);
+    for (const ei of path)
+      traffic[ei]++;
+  }
+  const edges = mstEdges.map((e, idx) => {
+    const gi = nodes[e.a], gj = nodes[e.b];
+    const p0 = points[gi], p1 = points[gj];
+    const mx = (p0.x + p1.x) / 2, my = (p0.y + p1.y) / 2;
+    const seed = hashCoords(p0.x + p1.x, p0.y + p1.y);
+    const rng = mulberry326(seed);
+    const dx = p1.x - p0.x, dy = p1.y - p0.y;
+    const len = Math.sqrt(dx * dx + dy * dy) || 1e-3;
+    const px = -dy / len, py = dx / len;
+    const offset = (rng() - 0.5) * len * 0.15;
+    const controlPt = { x: mx + px * offset, y: my + py * offset };
+    let isOcean = false;
+    if (terrainTypes) {
+      const tA = terrainTypes[gi];
+      const tB = terrainTypes[gj];
+      isOcean = (tA === "reef" || tA === "port") && (tB === "reef" || tB === "port");
+    }
+    return {
+      from: gi,
+      to: gj,
+      traffic: traffic[idx],
+      isOcean,
+      controlPt
+    };
+  });
+  return { edges, linkPaths };
+}
+
 // src/view.ts
 var VIEW_TYPE = "chorographia-map";
-var FOLDER_COLORS = [
-  "#8E9AAF",
-  "#C9963B",
-  "#B28DFF",
-  "#5AC6CE",
-  "#B8541A",
-  "#9AB2AF",
-  "#BCDC2B",
-  "#FF7A00",
-  "#A855F7",
-  "#00D6FF",
-  "#00FFB3",
-  "#FF3DB8"
-];
-var SEM_PALETTE3 = [
-  "#00D6FF",
-  "#B9FF00",
-  "#FF7A00",
-  "#A855F7",
-  "#00FFB3",
-  "#FF3DB8",
-  "#00FFA3",
-  "#FFD400",
-  "#00F5D4",
-  "#FF9A3D",
-  "#7CFFCB",
-  "#B8C0FF"
-];
-var SEM_SPLIT = { 1: 0.8, 2: 0.65, 3: 0.5, 4: 0.35, 5: 0.2 };
-var TYPE_COLORS = {
-  SRC: "#8E9AAF",
-  LIT: "#C9963B",
-  SEED: "#B8541A",
-  EVE: "#B28DFF",
-  REV: "#9AB2AF",
-  NOTE: "#5AC6CE"
-};
 function hexToRgb(hex) {
   const n = parseInt(hex.slice(1), 16);
   return [n >> 16 & 255, n >> 8 & 255, n & 255];
@@ -10161,20 +10870,6 @@ function hashStr(s) {
     h = (h << 5) - h + s.charCodeAt(i) | 0;
   return Math.abs(h);
 }
-var DARK = {
-  panelBg: "rgba(15,15,26,0.92)",
-  panelBorder: "rgba(44,44,58,0.6)",
-  text: "#D6D6E0",
-  textMuted: "#8E9AAF",
-  linkStroke: "rgba(214,214,224,0.18)"
-};
-var LIGHT = {
-  panelBg: "rgba(255,255,255,0.92)",
-  panelBorder: "rgba(160,160,180,0.4)",
-  text: "#1e1e2e",
-  textMuted: "#6e6e80",
-  linkStroke: "rgba(60,60,80,0.22)"
-};
 var ChorographiaView = class extends import_obsidian6.ItemView {
   constructor(leaf, plugin) {
     super(leaf);
@@ -10187,6 +10882,8 @@ var ChorographiaView = class extends import_obsidian6.ItemView {
     this.borderEdges = [];
     this.subZonesMap = /* @__PURE__ */ new Map();
     // globalZoneId → sub-zones (global coords)
+    this.terrainTypes = [];
+    this.routeNetwork = null;
     this.zoom = 1;
     this.panX = 0;
     this.panY = 0;
@@ -10210,12 +10907,39 @@ var ChorographiaView = class extends import_obsidian6.ItemView {
     // color maps
     this.folderColorMap = /* @__PURE__ */ new Map();
     this.catColorMap = /* @__PURE__ */ new Map();
+    this.allPanels = [];
+    this.editMode = false;
+    // export state
+    this.exportMode = "current";
+    this.exportScale = 2;
+    this.exportZoneLabels = true;
+    this.exportSubZoneLabels = true;
+    this.exportNoteTitles = true;
+    this.exportLinks = true;
+    this.regionSelectActive = false;
+    this.regionStart = null;
+    this.regionEnd = null;
+    this.regionWorld = null;
+    this.exportLabelOverride = false;
+    this.exportLabelScale = 1;
+    this.editingLabel = null;
+    this.labelHitboxes = [];
     this.activeFolderFilters = /* @__PURE__ */ new Set();
     this.activeTagFilters = /* @__PURE__ */ new Set();
     this.plugin = plugin;
   }
+  get mapTheme() {
+    return this.plugin.getActiveTheme();
+  }
   get theme() {
-    return document.body.classList.contains("theme-light") ? LIGHT : DARK;
+    const t = this.mapTheme;
+    return document.body.classList.contains("theme-light") ? t.ui.light : t.ui.dark;
+  }
+  applyThemeBackground(root) {
+    const el = root || this.containerEl.children[1];
+    const isDark = document.body.classList.contains("theme-dark");
+    const bg = this.mapTheme.background;
+    el.style.setProperty("--chorographia-bg", isDark ? bg.dark.container : bg.light.container);
   }
   getViewType() {
     return VIEW_TYPE;
@@ -10232,6 +10956,7 @@ var ChorographiaView = class extends import_obsidian6.ItemView {
     root.empty();
     root.addClass("chorographia-container");
     root.style.overflow = "hidden";
+    this.applyThemeBackground(root);
     this.containerEl.style.overflow = "hidden";
     this.canvas = root.createEl("canvas", { cls: "chorographia-canvas" });
     this.statusEl = root.createEl("div", { cls: "chorographia-status" });
@@ -10255,10 +10980,57 @@ var ChorographiaView = class extends import_obsidian6.ItemView {
   }
   // ===================== controls =====================
   buildControls(root) {
-    this.menuBtn = root.createEl("button", { cls: "chorographia-menu-btn", attr: { "aria-label": "Map settings" } });
-    this.menuBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`;
-    this.menuPanel = root.createEl("div", { cls: "chorographia-menu" });
-    const colorRow = this.menuPanel.createEl("div", { cls: "chorographia-menu-row" });
+    const gearSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`;
+    const cameraSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>`;
+    const downloadSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
+    const iconBar = root.createEl("div", { cls: "chorographia-icon-bar" });
+    const settingsBtn = iconBar.createEl("button", { cls: "chorographia-icon-btn", attr: { "aria-label": "Settings" } });
+    settingsBtn.innerHTML = gearSvg;
+    const snapshotBtn = iconBar.createEl("button", { cls: "chorographia-icon-btn", attr: { "aria-label": "Snapshots" } });
+    snapshotBtn.innerHTML = cameraSvg;
+    const exportBtn = iconBar.createEl("button", { cls: "chorographia-icon-btn", attr: { "aria-label": "Export" } });
+    exportBtn.innerHTML = downloadSvg;
+    this.settingsPanel = root.createEl("div", { cls: "chorographia-menu" });
+    this.snapshotPanel = root.createEl("div", { cls: "chorographia-menu chorographia-snapshot-panel" });
+    this.exportPanel = root.createEl("div", { cls: "chorographia-menu chorographia-export-panel" });
+    this.allPanels = [this.settingsPanel, this.snapshotPanel, this.exportPanel];
+    this.buildSettingsPanel();
+    this.buildSnapshotPanel();
+    this.buildExportPanel();
+    settingsBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.togglePanel(this.settingsPanel);
+    });
+    snapshotBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.togglePanel(this.snapshotPanel);
+    });
+    exportBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.togglePanel(this.exportPanel);
+    });
+    this.canvas.addEventListener("mousedown", () => {
+      if (this.regionSelectActive)
+        return;
+      this.closeAllPanels();
+    }, true);
+  }
+  togglePanel(panel) {
+    const wasOpen = panel.classList.contains("is-open");
+    for (const p of this.allPanels)
+      p.classList.remove("is-open");
+    if (!wasOpen)
+      panel.classList.add("is-open");
+  }
+  closeAllPanels() {
+    for (const p of this.allPanels)
+      p.classList.remove("is-open");
+  }
+  // ---------- settings panel ----------
+  buildSettingsPanel() {
+    const panel = this.settingsPanel;
+    panel.createEl("div", { cls: "chorographia-panel-heading", text: "SETTINGS" });
+    const colorRow = panel.createEl("div", { cls: "chorographia-menu-row" });
     colorRow.createEl("span", { text: "Color" });
     this.colorModeSelect = colorRow.createEl("select");
     for (const [v, t] of [
@@ -10274,7 +11046,7 @@ var ChorographiaView = class extends import_obsidian6.ItemView {
       await this.plugin.saveSettings();
       this.draw();
     });
-    const linksRow = this.menuPanel.createEl("div", { cls: "chorographia-menu-row" });
+    const linksRow = panel.createEl("div", { cls: "chorographia-menu-row" });
     const linksLbl = linksRow.createEl("label", { cls: "chorographia-toggle-label" });
     this.linksToggle = linksLbl.createEl("input", { type: "checkbox" });
     this.linksToggle.checked = this.plugin.settings.showLinks;
@@ -10284,7 +11056,7 @@ var ChorographiaView = class extends import_obsidian6.ItemView {
       await this.plugin.saveSettings();
       this.draw();
     });
-    const zonesRow = this.menuPanel.createEl("div", { cls: "chorographia-menu-row" });
+    const zonesRow = panel.createEl("div", { cls: "chorographia-menu-row" });
     const zonesLbl = zonesRow.createEl("label", { cls: "chorographia-toggle-label" });
     this.zonesToggle = zonesLbl.createEl("input", { type: "checkbox" });
     this.zonesToggle.checked = this.plugin.settings.showZones;
@@ -10294,7 +11066,7 @@ var ChorographiaView = class extends import_obsidian6.ItemView {
       await this.plugin.saveSettings();
       this.draw();
     });
-    const subZonesRow = this.menuPanel.createEl("div", { cls: "chorographia-menu-row" });
+    const subZonesRow = panel.createEl("div", { cls: "chorographia-menu-row" });
     const subZonesLbl = subZonesRow.createEl("label", { cls: "chorographia-toggle-label" });
     this.subZonesToggle = subZonesLbl.createEl("input", { type: "checkbox" });
     this.subZonesToggle.checked = this.plugin.settings.showSubZones;
@@ -10304,7 +11076,19 @@ var ChorographiaView = class extends import_obsidian6.ItemView {
       await this.plugin.saveSettings();
       this.draw();
     });
-    const titlesRow = this.menuPanel.createEl("div", { cls: "chorographia-menu-row" });
+    const editRow = panel.createEl("div", { cls: "chorographia-menu-row" });
+    const editLbl = editRow.createEl("label", { cls: "chorographia-toggle-label" });
+    const editToggle = editLbl.createEl("input", { type: "checkbox" });
+    editLbl.appendText(" Edit Labels");
+    editToggle.addEventListener("change", () => {
+      this.editMode = editToggle.checked;
+      if (!this.editMode && this.editingLabel) {
+        this.editingLabel.el.remove();
+        this.editingLabel = null;
+      }
+      this.draw();
+    });
+    const titlesRow = panel.createEl("div", { cls: "chorographia-menu-row" });
     const titlesLbl = titlesRow.createEl("label", { cls: "chorographia-toggle-label" });
     this.titlesToggle = titlesLbl.createEl("input", { type: "checkbox" });
     this.titlesToggle.checked = this.plugin.settings.showNoteTitles;
@@ -10314,7 +11098,7 @@ var ChorographiaView = class extends import_obsidian6.ItemView {
       await this.plugin.saveSettings();
       this.draw();
     });
-    const minimapRow = this.menuPanel.createEl("div", { cls: "chorographia-menu-row" });
+    const minimapRow = panel.createEl("div", { cls: "chorographia-menu-row" });
     minimapRow.createEl("span", { text: "Minimap" });
     this.minimapSelect = minimapRow.createEl("select");
     for (const [v, t] of [
@@ -10331,116 +11115,341 @@ var ChorographiaView = class extends import_obsidian6.ItemView {
       await this.plugin.saveSettings();
       this.draw();
     });
-    this.menuPanel.createEl("div", { cls: "chorographia-menu-sep" });
-    const searchRow = this.menuPanel.createEl("div", { cls: "chorographia-menu-row chorographia-search-row" });
-    this.searchInput = searchRow.createEl("input", {
-      cls: "chorographia-search-input",
-      attr: { type: "text", placeholder: "Jump to note..." }
-    });
-    this.searchResults = this.menuPanel.createEl("div", { cls: "chorographia-search-results" });
-    this.searchInput.addEventListener("input", () => this.onSearchInput());
-    this.searchInput.addEventListener("keydown", (e) => {
-      if (e.key === "Enter")
-        this.onSearchSelect();
-      if (e.key === "Escape") {
-        this.searchInput.value = "";
-        this.searchResults.empty();
-      }
-    });
-    const zoneRow = this.menuPanel.createEl("div", { cls: "chorographia-menu-row" });
-    zoneRow.createEl("span", { text: "Zone" });
-    this.zoneJumpSelect = zoneRow.createEl("select");
-    this.zoneJumpSelect.createEl("option", { text: "\u2014", value: "" });
-    this.zoneJumpSelect.addEventListener("change", () => this.onZoneJump());
-    this.menuPanel.createEl("div", { cls: "chorographia-menu-sep" });
-    const filterHeader = this.menuPanel.createEl("div", { cls: "chorographia-menu-row" });
+    panel.createEl("div", { cls: "chorographia-menu-sep" });
+    const filterHeader = panel.createEl("div", { cls: "chorographia-menu-row" });
     filterHeader.createEl("span", { text: "Filters", cls: "chorographia-filter-header" });
     const filterClearBtn = filterHeader.createEl("button", { cls: "chorographia-filter-clear", text: "Clear" });
     filterClearBtn.addEventListener("click", () => this.clearFilters());
-    this.filterPanel = this.menuPanel.createEl("div", { cls: "chorographia-filter-panel" });
-    this.menuPanel.createEl("div", { cls: "chorographia-menu-sep" });
-    const exportRow = this.menuPanel.createEl("div", { cls: "chorographia-menu-row" });
-    const exportBtn = exportRow.createEl("button", { cls: "chorographia-menu-export", text: "Export PNG" });
-    exportBtn.addEventListener("click", () => this.exportMap());
-    this.menuBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      this.menuPanel.classList.toggle("is-open");
-    });
-    this.canvas.addEventListener("mousedown", () => {
-      this.menuPanel.classList.remove("is-open");
-    }, true);
+    this.filterPanel = panel.createEl("div", { cls: "chorographia-filter-panel" });
   }
-  exportMap() {
-    this.canvas.toBlob((blob) => {
-      if (!blob) {
-        new import_obsidian6.Notice("Chorographia: Export failed.");
+  // ---------- snapshot panel ----------
+  buildSnapshotPanel() {
+    const panel = this.snapshotPanel;
+    panel.createEl("div", { cls: "chorographia-panel-heading", text: "SNAPSHOTS" });
+    const saveInput = panel.createEl("input", {
+      cls: "chorographia-snapshot-save-input",
+      attr: { type: "text", placeholder: "Name this snapshot..." }
+    });
+    const saveBtn = panel.createEl("button", { cls: "chorographia-export-btn-primary", text: "Save Snapshot" });
+    saveBtn.addEventListener("click", async () => {
+      const name = saveInput.value.trim();
+      if (!name) {
+        new import_obsidian6.Notice("Enter a name for the snapshot.");
         return;
       }
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      const date = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
-      a.download = `chorographia-${date}.png`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      new import_obsidian6.Notice("Chorographia: Map exported.");
+      saveBtn.disabled = true;
+      try {
+        await this.plugin.saveSnapshot(name);
+        new import_obsidian6.Notice(`Snapshot "${name}" saved.`);
+        saveInput.value = "";
+        this.refreshSnapshotList();
+      } catch (e) {
+        new import_obsidian6.Notice("Save failed: " + e.message);
+      }
+      saveBtn.disabled = false;
+    });
+    panel.createEl("div", { cls: "chorographia-menu-sep" });
+    panel.createEl("div", { cls: "chorographia-panel-subheading", text: "Saved Snapshots:" });
+    this.snapshotListEl = panel.createEl("div", { cls: "chorographia-snapshot-list" });
+    this.refreshSnapshotList();
+  }
+  async refreshSnapshotList() {
+    this.snapshotListEl.empty();
+    const snaps = await this.plugin.listSnapshots();
+    if (snaps.length === 0) {
+      this.snapshotListEl.createEl("div", { cls: "chorographia-filter-empty", text: "No snapshots yet" });
+      return;
+    }
+    for (const s of snaps) {
+      const row = this.snapshotListEl.createEl("div", { cls: "chorographia-snapshot-list-item" });
+      const info = row.createEl("div", { cls: "chorographia-snapshot-list-info" });
+      info.createEl("span", { cls: "chorographia-snapshot-list-name", text: s.name });
+      const date = new Date(s.timestamp);
+      const dateStr = date.toLocaleDateString(void 0, { month: "short", day: "numeric" });
+      info.createEl("span", { cls: "chorographia-snapshot-list-date", text: dateStr });
+      const delBtn = row.createEl("button", { cls: "chorographia-snapshot-list-del", text: "\xD7" });
+      let confirmPending = false;
+      delBtn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        if (!confirmPending) {
+          confirmPending = true;
+          row.classList.add("is-confirm");
+          delBtn.textContent = "Del?";
+          setTimeout(() => {
+            if (confirmPending) {
+              confirmPending = false;
+              row.classList.remove("is-confirm");
+              delBtn.textContent = "\xD7";
+            }
+          }, 3e3);
+          return;
+        }
+        await this.plugin.deleteSnapshot(s.path);
+        new import_obsidian6.Notice("Snapshot deleted.");
+        this.refreshSnapshotList();
+      });
+      row.addEventListener("click", async () => {
+        try {
+          await this.plugin.loadSnapshot(s.path);
+          new import_obsidian6.Notice(`Snapshot "${s.name}" loaded.`);
+        } catch (e) {
+          new import_obsidian6.Notice("Load failed: " + e.message);
+        }
+      });
+    }
+  }
+  // ---------- export panel ----------
+  buildExportPanel() {
+    const panel = this.exportPanel;
+    panel.createEl("div", { cls: "chorographia-panel-heading", text: "EXPORT MAP" });
+    const modeGroup = panel.createEl("div", { cls: "chorographia-export-mode-group" });
+    const modes = [
+      { value: "current", label: "Current View" },
+      { value: "whole", label: "Whole Map" },
+      { value: "region", label: "Select Region" }
+    ];
+    const modeEls = [];
+    for (const m of modes) {
+      const item = modeGroup.createEl("div", { cls: "chorographia-export-mode-item" + (m.value === this.exportMode ? " is-active" : "") });
+      item.createEl("span", { text: m.label });
+      modeEls.push(item);
+      item.addEventListener("click", () => {
+        this.exportMode = m.value;
+        for (const el of modeEls)
+          el.classList.remove("is-active");
+        item.classList.add("is-active");
+        this.updateExportOptions(optionsContainer, exportActionBtn);
+        if (m.value !== "region") {
+          this.regionSelectActive = false;
+          this.regionStart = null;
+          this.regionEnd = null;
+          this.regionWorld = null;
+          this.draw();
+        }
+      });
+    }
+    const optionsContainer = panel.createEl("div", { cls: "chorographia-export-options" });
+    const exportActionBtn = panel.createEl("button", { cls: "chorographia-export-btn-primary", text: "Export PNG" });
+    exportActionBtn.addEventListener("click", () => this.executeExport());
+    this.updateExportOptions(optionsContainer, exportActionBtn);
+  }
+  updateExportOptions(container, exportBtn) {
+    container.empty();
+    const hintEl = this.containerEl.querySelector(".chorographia-region-hint");
+    if (hintEl)
+      hintEl.remove();
+    if (this.exportMode === "current") {
+      exportBtn.textContent = "Export PNG";
+      exportBtn.disabled = false;
+      this.regionSelectActive = false;
+      return;
+    }
+    if (this.exportMode === "region") {
+      exportBtn.textContent = "Export Region";
+      exportBtn.disabled = !this.regionWorld;
+      this.regionSelectActive = true;
+      const root = this.containerEl.children[1];
+      root.createEl("div", { cls: "chorographia-region-hint", text: "Draw a rectangle on the map" });
+      this.draw();
+    } else {
+      this.regionSelectActive = false;
+      exportBtn.textContent = "Export PNG";
+      exportBtn.disabled = false;
+    }
+    const zlLabel = container.createEl("label", { cls: "chorographia-toggle-label" });
+    const zlCb = zlLabel.createEl("input", { type: "checkbox" });
+    zlCb.checked = this.exportZoneLabels;
+    zlLabel.appendText(" Zone labels");
+    zlCb.addEventListener("change", () => {
+      this.exportZoneLabels = zlCb.checked;
+    });
+    const szLabel = container.createEl("label", { cls: "chorographia-toggle-label" });
+    const szCb = szLabel.createEl("input", { type: "checkbox" });
+    szCb.checked = this.exportSubZoneLabels;
+    szLabel.appendText(" Sub-zone labels");
+    szCb.addEventListener("change", () => {
+      this.exportSubZoneLabels = szCb.checked;
+    });
+    const ntLabel = container.createEl("label", { cls: "chorographia-toggle-label" });
+    const ntCb = ntLabel.createEl("input", { type: "checkbox" });
+    ntCb.checked = this.exportNoteTitles;
+    ntLabel.appendText(" Note titles");
+    ntCb.addEventListener("change", () => {
+      this.exportNoteTitles = ntCb.checked;
+    });
+    const lnLabel = container.createEl("label", { cls: "chorographia-toggle-label" });
+    const lnCb = lnLabel.createEl("input", { type: "checkbox" });
+    lnCb.checked = this.exportLinks;
+    lnLabel.appendText(" Links");
+    lnCb.addEventListener("change", () => {
+      this.exportLinks = lnCb.checked;
+    });
+    const scaleRow = container.createEl("div", { cls: "chorographia-export-scale-group" });
+    scaleRow.createEl("span", { text: "Scale:" });
+    for (const s of [1, 2, 4]) {
+      const btn = scaleRow.createEl("button", {
+        cls: "chorographia-export-scale-btn" + (s === this.exportScale ? " is-active" : ""),
+        text: `${s}x`
+      });
+      btn.addEventListener("click", () => {
+        this.exportScale = s;
+        scaleRow.querySelectorAll(".chorographia-export-scale-btn").forEach((el) => el.classList.remove("is-active"));
+        btn.classList.add("is-active");
+      });
+    }
+  }
+  executeExport() {
+    if (this.exportMode === "current") {
+      this.exportCurrentView();
+    } else if (this.exportMode === "whole") {
+      this.exportWholeMap();
+    } else if (this.exportMode === "region") {
+      if (!this.regionWorld) {
+        new import_obsidian6.Notice("Draw a rectangle on the map first.");
+        return;
+      }
+      this.exportRegion();
+    }
+  }
+  exportCurrentView() {
+    this.canvas.toBlob((blob) => {
+      if (!blob) {
+        new import_obsidian6.Notice("Export failed.");
+        return;
+      }
+      this.downloadBlob(blob, "chorographia-view");
     }, "image/png");
   }
-  onSearchInput() {
-    const query = this.searchInput.value.toLowerCase().trim();
-    this.searchResults.empty();
-    if (!query || query.length < 2)
+  exportWholeMap() {
+    if (this.allPoints.length === 0) {
+      new import_obsidian6.Notice("No points to export.");
       return;
-    const matches = this.allPoints.filter((p) => p.title.toLowerCase().includes(query)).slice(0, 8);
-    for (const m of matches) {
-      const item = this.searchResults.createEl("div", {
-        cls: "chorographia-search-item",
-        text: m.title.length > 50 ? m.title.slice(0, 47) + "..." : m.title
-      });
-      item.addEventListener("click", () => {
-        this.zoom = 8;
-        this.animateTo(m.x, m.y);
-        this.searchInput.value = "";
-        this.searchResults.empty();
-        this.menuPanel.classList.remove("is-open");
-      });
     }
-  }
-  onSearchSelect() {
-    const first = this.searchResults.querySelector(".chorographia-search-item");
-    if (first)
-      first.click();
-  }
-  onZoneJump() {
-    const val = this.zoneJumpSelect.value;
-    if (!val)
-      return;
-    const idx = parseInt(val, 10);
-    const zone = this.zones[idx];
-    if (!zone)
-      return;
-    const blob = zone.blob;
-    if (blob.length === 0)
-      return;
-    const cx = blob.reduce((s, p) => s + p.x, 0) / blob.length;
-    const cy = blob.reduce((s, p) => s + p.y, 0) / blob.length;
-    this.zoom = 3;
-    this.animateTo(cx, cy);
-    this.zoneJumpSelect.value = "";
-    this.menuPanel.classList.remove("is-open");
-  }
-  updateZoneJumpOptions() {
-    while (this.zoneJumpSelect.options.length > 1) {
-      this.zoneJumpSelect.remove(1);
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (const p of this.allPoints) {
+      if (p.x < minX)
+        minX = p.x;
+      if (p.x > maxX)
+        maxX = p.x;
+      if (p.y < minY)
+        minY = p.y;
+      if (p.y > maxY)
+        maxY = p.y;
     }
-    for (let i = 0; i < this.zones.length; i++) {
-      this.zoneJumpSelect.createEl("option", {
-        text: this.zones[i].label || `Zone ${i + 1}`,
-        value: String(i)
-      });
+    const margin = 0.15;
+    const rangeX = maxX - minX || 0.01;
+    const rangeY = maxY - minY || 0.01;
+    minX -= rangeX * margin;
+    maxX += rangeX * margin;
+    minY -= rangeY * margin;
+    maxY += rangeY * margin;
+    this.exportWorldRect(minX, minY, maxX, maxY);
+  }
+  exportRegion() {
+    if (!this.regionWorld)
+      return;
+    const r = this.regionWorld;
+    this.exportWorldRect(
+      Math.min(r.x1, r.x2),
+      Math.min(r.y1, r.y2),
+      Math.max(r.x1, r.x2),
+      Math.max(r.y1, r.y2)
+    );
+  }
+  exportWorldRect(wMinX, wMinY, wMaxX, wMaxY) {
+    const baseSize = 2048;
+    const scale = this.exportScale;
+    const rangeX = wMaxX - wMinX;
+    const rangeY = wMaxY - wMinY;
+    const aspect = rangeX / rangeY;
+    let canvasW, canvasH;
+    if (aspect >= 1) {
+      canvasW = baseSize * scale;
+      canvasH = Math.round(canvasW / aspect);
+    } else {
+      canvasH = baseSize * scale;
+      canvasW = Math.round(canvasH * aspect);
     }
+    const maxDim = 16384;
+    if (canvasW > maxDim || canvasH > maxDim) {
+      const f = maxDim / Math.max(canvasW, canvasH);
+      canvasW = Math.round(canvasW * f);
+      canvasH = Math.round(canvasH * f);
+    }
+    const offCanvas = document.createElement("canvas");
+    offCanvas.width = canvasW;
+    offCanvas.height = canvasH;
+    const offCtx = offCanvas.getContext("2d");
+    const origCanvas = this.canvas;
+    const origCtx = this.ctx;
+    const origDpr = this.dpr;
+    const origZoom = this.zoom;
+    const origPanX = this.panX;
+    const origPanY = this.panY;
+    const origShowZones = this.plugin.settings.showZones;
+    const origShowSubZones = this.plugin.settings.showSubZones;
+    const origShowTitles = this.plugin.settings.showNoteTitles;
+    const origTitleOpacity = this.plugin.settings.noteTitleOpacity;
+    const origShowLinks = this.plugin.settings.showLinks;
+    const origMinimap = this.plugin.settings.minimapCorner;
+    this.canvas = offCanvas;
+    this.ctx = offCtx;
+    this.dpr = 1;
+    const cx = (wMinX + wMaxX) / 2;
+    const cy = (wMinY + wMaxY) / 2;
+    const fitDim = Math.min(canvasW, canvasH);
+    const zoomX = canvasW / (fitDim * 0.42 * rangeX);
+    const zoomY = canvasH / (fitDim * 0.42 * rangeY);
+    this.zoom = Math.min(zoomX, zoomY) * 0.95;
+    const s = fitDim * 0.42 * this.zoom;
+    this.panX = -cx * s;
+    this.panY = cy * s;
+    this.plugin.settings.showZones = this.exportZoneLabels;
+    this.plugin.settings.showSubZones = this.exportSubZoneLabels;
+    this.plugin.settings.showNoteTitles = this.exportNoteTitles;
+    this.plugin.settings.noteTitleOpacity = this.exportNoteTitles ? 1 : 0;
+    this.plugin.settings.showLinks = this.exportLinks;
+    this.plugin.settings.minimapCorner = this.exportMode === "region" ? origMinimap : "off";
+    Object.defineProperty(offCanvas, "clientWidth", { value: canvasW, configurable: true });
+    Object.defineProperty(offCanvas, "clientHeight", { value: canvasH, configurable: true });
+    this.exportLabelOverride = true;
+    this.exportLabelScale = Math.max(canvasW / scale, canvasH / scale) / 1200;
+    this.draw();
+    this.exportLabelOverride = false;
+    this.exportLabelScale = 1;
+    this.canvas = origCanvas;
+    this.ctx = origCtx;
+    this.dpr = origDpr;
+    this.zoom = origZoom;
+    this.panX = origPanX;
+    this.panY = origPanY;
+    this.plugin.settings.showZones = origShowZones;
+    this.plugin.settings.showSubZones = origShowSubZones;
+    this.plugin.settings.showNoteTitles = origShowTitles;
+    this.plugin.settings.noteTitleOpacity = origTitleOpacity;
+    this.plugin.settings.showLinks = origShowLinks;
+    this.plugin.settings.minimapCorner = origMinimap;
+    offCanvas.toBlob((blob) => {
+      if (!blob) {
+        new import_obsidian6.Notice("Export failed.");
+        return;
+      }
+      const suffix = this.exportMode === "region" ? "region" : "full";
+      this.downloadBlob(blob, `chorographia-${suffix}`);
+      new import_obsidian6.Notice("Map exported.");
+    }, "image/png");
+  }
+  downloadBlob(blob, prefix) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    const date = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+    a.download = `${prefix}-${date}.png`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    new import_obsidian6.Notice("Map exported.");
   }
   buildFilterUI() {
     this.filterPanel.empty();
@@ -10550,8 +11559,9 @@ var ChorographiaView = class extends import_obsidian6.ItemView {
       if (p.cat)
         cats.add(p.cat);
     }
-    [...folders].sort().forEach((f, i) => this.folderColorMap.set(f, FOLDER_COLORS[i % FOLDER_COLORS.length]));
-    [...cats].sort().forEach((c, i) => this.catColorMap.set(c, FOLDER_COLORS[i % FOLDER_COLORS.length]));
+    const folderPal = this.mapTheme.palette.folder;
+    [...folders].sort().forEach((f, i) => this.folderColorMap.set(f, folderPal[i % folderPal.length]));
+    [...cats].sort().forEach((c, i) => this.catColorMap.set(c, folderPal[i % folderPal.length]));
     this.allPoints = pts;
     this.points = pts;
     this.hoverIdx = -1;
@@ -10562,7 +11572,18 @@ var ChorographiaView = class extends import_obsidian6.ItemView {
     } catch (e) {
       console.error("Chorographia: zone computation failed", e);
     }
-    this.updateZoneJumpOptions();
+    if (this.mapTheme.decorative.routeNetwork && pts.length > 1) {
+      const pathIdx = /* @__PURE__ */ new Map();
+      pts.forEach((p, i) => pathIdx.set(p.path, i));
+      const links = pts.map((p) => p.links.map((l) => pathIdx.get(l)).filter((i) => i != null));
+      this.routeNetwork = computeRouteNetwork(
+        pts.map((p) => ({ x: p.x, y: p.y })),
+        links,
+        this.terrainTypes.length > 0 ? this.terrainTypes : void 0
+      );
+    } else {
+      this.routeNetwork = null;
+    }
     this.buildFilterUI();
     this.applyFilters();
     this.draw();
@@ -10618,18 +11639,21 @@ var ChorographiaView = class extends import_obsidian6.ItemView {
             unity: this.plugin.settings.worldmapUnity,
             ruggedness: this.plugin.settings.worldmapRuggedness
           };
-          const result = computeWorldMapZones(pointsForZones2, assignments2, k, subCentroidsByCluster2, wmSettings);
+          const result = computeWorldMapZones(pointsForZones2, assignments2, k, subCentroidsByCluster2, wmSettings, this.mapTheme.palette.semantic);
           this.zones = result.zones;
           this.continents = result.continents;
           this.borderEdges = result.borderEdges;
         } else {
-          this.zones = computeZones(pointsForZones2, assignments2, k);
+          this.zones = computeZones(pointsForZones2, assignments2, k, this.mapTheme.palette.semantic);
           this.continents = [];
           this.borderEdges = [];
         }
         for (const zone of this.zones) {
           if (cached.labels[zone.id])
             zone.label = cached.labels[zone.id];
+          const userLabel = this.plugin.cache.userLabelOverrides?.[zone.id];
+          if (userLabel)
+            zone.label = userLabel;
         }
         this.subZonesMap.clear();
         if (cached.subAssignments) {
@@ -10647,12 +11671,19 @@ var ChorographiaView = class extends import_obsidian6.ItemView {
             }
             if (subPts.length > 0) {
               const localK2 = Math.max(2, Math.round(k / 4));
-              const subZones = isWorldmap ? computeWorldMapSubZones(zone.hull, subPts, subIdx, localK2) : computeZones(subPts, subIdx, localK2);
+              const subZones = isWorldmap ? computeWorldMapSubZones(zone.hull, subPts, subIdx, localK2, this.mapTheme.palette.semantic) : computeZones(subPts, subIdx, localK2, this.mapTheme.palette.semantic);
               const subLabels = cached.subLabels?.[zone.id];
               if (subLabels) {
                 for (const sz of subZones) {
                   if (subLabels[sz.id])
                     sz.label = subLabels[sz.id];
+                }
+              }
+              const userSubs = this.plugin.cache.userSubLabelOverrides?.[zone.id];
+              if (userSubs) {
+                for (const sz of subZones) {
+                  if (userSubs[sz.id])
+                    sz.label = userSubs[sz.id];
                 }
               }
               this.subZonesMap.set(zone.id, subZones);
@@ -10682,6 +11713,7 @@ var ChorographiaView = class extends import_obsidian6.ItemView {
             }
           }
         }
+        this.classifyTerrainTypes();
         return;
       }
     }
@@ -10786,7 +11818,7 @@ var ChorographiaView = class extends import_obsidian6.ItemView {
         unity: this.plugin.settings.worldmapUnity,
         ruggedness: this.plugin.settings.worldmapRuggedness
       };
-      const result = computeWorldMapZones(pointsForZones, pointAssignments, k, subCentroidsByCluster, wmSettings);
+      const result = computeWorldMapZones(pointsForZones, pointAssignments, k, subCentroidsByCluster, wmSettings, this.mapTheme.palette.semantic);
       this.zones = result.zones;
       this.continents = result.continents;
       this.borderEdges = result.borderEdges;
@@ -10842,7 +11874,7 @@ var ChorographiaView = class extends import_obsidian6.ItemView {
       }
       if (subPts.length === 0)
         continue;
-      const subZones = isWorldmap ? computeWorldMapSubZones(zone.hull, subPts, subIdx, localK) : computeZones(subPts, subIdx, localK);
+      const subZones = isWorldmap ? computeWorldMapSubZones(zone.hull, subPts, subIdx, localK, this.mapTheme.palette.semantic) : computeZones(subPts, subIdx, localK, this.mapTheme.palette.semantic);
       const subLabelMap = {};
       for (const sz of subZones)
         subLabelMap[sz.id] = sz.label;
@@ -10908,6 +11940,31 @@ var ChorographiaView = class extends import_obsidian6.ItemView {
         }
       }
     }
+    if (this.plugin.cache.userLabelOverrides) {
+      for (const zone of this.zones) {
+        const userLabel = this.plugin.cache.userLabelOverrides[zone.id];
+        if (userLabel) {
+          zone.label = userLabel;
+          labelMap[zone.id] = userLabel;
+        }
+      }
+    }
+    if (this.plugin.cache.userSubLabelOverrides) {
+      for (const [zoneId, subZones] of this.subZonesMap) {
+        const userSubs = this.plugin.cache.userSubLabelOverrides[zoneId];
+        if (!userSubs)
+          continue;
+        for (const sz of subZones) {
+          const userLabel = userSubs[sz.id];
+          if (userLabel) {
+            sz.label = userLabel;
+            if (subLabelsCache[zoneId])
+              subLabelsCache[zoneId][sz.id] = userLabel;
+          }
+        }
+      }
+    }
+    this.classifyTerrainTypes();
     if (!this.plugin.cache.zones)
       this.plugin.cache.zones = {};
     this.plugin.cache.zones[cacheKey] = {
@@ -10921,6 +11978,14 @@ var ChorographiaView = class extends import_obsidian6.ItemView {
       subLabels: subLabelsCache
     };
     await this.plugin.saveCache();
+  }
+  classifyTerrainTypes() {
+    if (this.mapTheme.noteStyle.shape === "terrain" && this.plugin.settings.zoneStyle === "worldmap" && this.continents.length > 0) {
+      const pts = this.points.map((p) => ({ x: p.x, y: p.y }));
+      this.terrainTypes = classifyAll(pts, this.continents);
+    } else {
+      this.terrainTypes = [];
+    }
   }
   // ===================== animation =====================
   animateTo(worldX, worldY) {
@@ -10979,34 +12044,37 @@ var ChorographiaView = class extends import_obsidian6.ItemView {
   }
   // ===================== coloring =====================
   color(p) {
+    const pal = this.mapTheme.palette;
     switch (this.plugin.settings.colorMode) {
       case "semantic":
         return this.semColor(p);
       case "folder":
-        return this.folderColorMap.get(p.folder) || FOLDER_COLORS[0];
+        return this.folderColorMap.get(p.folder) || pal.folder[0];
       case "type": {
         const t = p.noteType.toUpperCase();
-        return TYPE_COLORS[t] || FOLDER_COLORS[hashStr(p.noteType) % FOLDER_COLORS.length];
+        return pal.type[t] || pal.folder[hashStr(p.noteType) % pal.folder.length];
       }
       case "cat":
-        return p.cat ? this.catColorMap.get(p.cat) || FOLDER_COLORS[0] : FOLDER_COLORS[0];
+        return p.cat ? this.catColorMap.get(p.cat) || pal.folder[0] : pal.folder[0];
       default:
-        return FOLDER_COLORS[0];
+        return pal.folder[0];
     }
   }
   semColor(p) {
+    const pal = this.mapTheme.palette;
     if (p.semA < 0)
-      return this.folderColorMap.get(p.folder) || FOLDER_COLORS[0];
-    const cA = SEM_PALETTE3[p.semA % SEM_PALETTE3.length];
+      return this.folderColorMap.get(p.folder) || pal.folder[0];
+    const cA = pal.semantic[p.semA % pal.semantic.length];
     if (p.semB < 0 || p.semA === p.semB)
       return cA;
-    return lerpColor(cA, SEM_PALETTE3[p.semB % SEM_PALETTE3.length], 1 - (SEM_SPLIT[p.semW] ?? 0.5));
+    return lerpColor(cA, pal.semantic[p.semB % pal.semantic.length], 1 - (pal.semSplit[p.semW] ?? 0.5));
   }
   // ===================== draw =====================
   draw() {
     const ctx = this.ctx;
     const W = this.canvas.clientWidth, H = this.canvas.clientHeight;
     ctx.clearRect(0, 0, W, H);
+    this.labelHitboxes = [];
     const pts = this.points;
     const th = this.theme;
     if (!pts.length) {
@@ -11024,18 +12092,28 @@ var ChorographiaView = class extends import_obsidian6.ItemView {
     const idx = /* @__PURE__ */ new Map();
     pts.forEach((p, i) => idx.set(p.path, i));
     const scr = pts.map((p) => this.w2s(p.x, p.y));
+    this.drawGridLines(ctx, W, H);
     if (this.plugin.settings.showZones && this.zones.length > 0) {
       const w2sFn = (wx, wy) => this.w2s(wx, wy);
       const isWorldmap = this.plugin.settings.zoneStyle === "worldmap";
       const isDarkTheme = document.body.classList.contains("theme-dark");
-      let subAlpha = Math.max(0, Math.min(1, (zoom - 2) / 3));
+      let subAlpha = this.exportLabelOverride ? 1 : Math.max(0, Math.min(1, (zoom - 2) / 3));
       if (!this.plugin.settings.showSubZones)
         subAlpha = 0;
-      const globalZoneAlpha = 1 - subAlpha * 0.3;
+      const globalZoneAlpha = this.exportLabelOverride ? 1 : 1 - subAlpha * 0.3;
       const parentFillFade = 1 - subAlpha;
       if (isWorldmap && this.continents.length > 0) {
-        ctx.fillStyle = isDarkTheme ? "#0a0e1a" : "#e8eef5";
+        const bg = this.mapTheme.background;
+        ctx.fillStyle = isDarkTheme ? bg.dark.ocean : bg.light.ocean;
         ctx.fillRect(0, 0, W, H);
+        const decCfg = this.mapTheme.decorative;
+        if (decCfg.stippleOcean && decCfg.stippleDensity > 0) {
+          const stippleColor = isDarkTheme ? "rgba(180,190,200,1)" : "rgba(60,70,80,1)";
+          ctx.save();
+          ctx.globalAlpha = 0.06;
+          fillStipple(ctx, 0, 0, W, H, decCfg.stippleDensity, 0.5, stippleColor, 12345);
+          ctx.restore();
+        }
         const zoneById = /* @__PURE__ */ new Map();
         for (const zone of this.zones)
           zoneById.set(zone.id, zone);
@@ -11053,6 +12131,7 @@ var ChorographiaView = class extends import_obsidian6.ItemView {
             }
             ctx.closePath();
             ctx.clip();
+            const useInkProvinces = this.mapTheme.decorative.inkWobble;
             for (const zone of memberZones) {
               if (!zone.cellPolygons || zone.cellPolygons.length === 0)
                 continue;
@@ -11080,6 +12159,55 @@ var ChorographiaView = class extends import_obsidian6.ItemView {
                     ctx.closePath();
                     ctx.fill();
                   }
+                  if (useInkProvinces && si % 2 === 1) {
+                    const cells = zone.subDomainCells.get(subIds[si]);
+                    ctx.save();
+                    ctx.beginPath();
+                    for (const cell of cells) {
+                      if (cell.length < 3)
+                        continue;
+                      const cs0 = w2sFn(cell[0].x, cell[0].y);
+                      ctx.moveTo(cs0.x, cs0.y);
+                      for (let vi = 1; vi < cell.length; vi++) {
+                        const csv = w2sFn(cell[vi].x, cell[vi].y);
+                        ctx.lineTo(csv.x, csv.y);
+                      }
+                      ctx.closePath();
+                    }
+                    ctx.clip();
+                    let hMinX = Infinity, hMinY = Infinity, hMaxX = -Infinity, hMaxY = -Infinity;
+                    for (const cell of cells) {
+                      for (const v of cell) {
+                        const sv = w2sFn(v.x, v.y);
+                        if (sv.x < hMinX)
+                          hMinX = sv.x;
+                        if (sv.x > hMaxX)
+                          hMaxX = sv.x;
+                        if (sv.y < hMinY)
+                          hMinY = sv.y;
+                        if (sv.y > hMaxY)
+                          hMaxY = sv.y;
+                      }
+                    }
+                    const hatchAngle = Math.PI * 0.25 + si * 0.3;
+                    const hatchSpacing = 6;
+                    const hColor = isDarkTheme ? `rgba(${rgb.join(",")},${blendedAlpha * 1.5})` : `rgba(${rgb.join(",")},${blendedAlpha * 2})`;
+                    ctx.strokeStyle = hColor;
+                    ctx.lineWidth = 0.3;
+                    const cos = Math.cos(hatchAngle), sin = Math.sin(hatchAngle);
+                    const hcx = (hMinX + hMaxX) / 2, hcy = (hMinY + hMaxY) / 2;
+                    const diag = Math.sqrt((hMaxX - hMinX) ** 2 + (hMaxY - hMinY) ** 2);
+                    const count = Math.ceil(diag / hatchSpacing);
+                    ctx.beginPath();
+                    for (let hi = -count; hi <= count; hi++) {
+                      const off = hi * hatchSpacing;
+                      const lx = hcx + cos * off, ly = hcy + sin * off;
+                      ctx.moveTo(lx - sin * diag, ly + cos * diag);
+                      ctx.lineTo(lx + sin * diag, ly - cos * diag);
+                    }
+                    ctx.stroke();
+                    ctx.restore();
+                  }
                 }
               } else {
                 const fillAlpha = 0.12 * globalZoneAlpha;
@@ -11099,13 +12227,16 @@ var ChorographiaView = class extends import_obsidian6.ItemView {
                 }
               }
             }
-            const provinceAlpha = 0.2;
             const continentZoneSet = new Set(continent.zoneIds);
-            if (provinceAlpha > 0.01) {
-              const provColor = isDarkTheme ? `rgba(200,220,255,${provinceAlpha})` : `rgba(40,60,100,${provinceAlpha})`;
-              ctx.setLineDash([3, 4]);
+            const brd = this.mapTheme.borders;
+            const zoomWF = Math.max(0, Math.min(1, (zoom - 1) / 3));
+            const inkWobbleOn = decCfg.inkWobble && zoomWF > 0.05;
+            const inkAmpBase = (decCfg.inkWobbleAmplitude || 1) * zoomWF;
+            {
+              const provColor = isDarkTheme ? brd.province.dark : brd.province.light;
+              ctx.setLineDash(brd.provinceDash);
               ctx.strokeStyle = provColor;
-              ctx.lineWidth = 0.8;
+              ctx.lineWidth = brd.provinceWidth;
               for (const edge of this.borderEdges) {
                 if (edge.edgeType !== "province")
                   continue;
@@ -11114,47 +12245,113 @@ var ChorographiaView = class extends import_obsidian6.ItemView {
                 const edgeScreen = edge.vertices.map((p) => w2sFn(p.x, p.y));
                 if (edgeScreen.length < 2)
                   continue;
-                ctx.beginPath();
-                ctx.moveTo(edgeScreen[0].x, edgeScreen[0].y);
-                for (let ei = 1; ei < edgeScreen.length; ei++)
-                  ctx.lineTo(edgeScreen[ei].x, edgeScreen[ei].y);
-                ctx.stroke();
+                if (inkWobbleOn) {
+                  ctx.setLineDash([]);
+                  strokeWobblyPolyline(ctx, edgeScreen, inkAmpBase * 0.4, brd.provinceWidth, hashCoords(edge.leftZone, edge.rightZone));
+                } else {
+                  ctx.beginPath();
+                  ctx.moveTo(edgeScreen[0].x, edgeScreen[0].y);
+                  for (let ei = 1; ei < edgeScreen.length; ei++)
+                    ctx.lineTo(edgeScreen[ei].x, edgeScreen[ei].y);
+                  ctx.stroke();
+                }
               }
               ctx.setLineDash([]);
             }
-            const borderColor = isDarkTheme ? "rgba(200,220,255,0.2)" : "rgba(40,60,100,0.2)";
-            ctx.strokeStyle = borderColor;
-            ctx.lineWidth = 1;
-            for (const edge of this.borderEdges) {
-              if (edge.edgeType !== "border")
-                continue;
-              if (!continentZoneSet.has(edge.leftZone) && !continentZoneSet.has(edge.rightZone))
-                continue;
-              const edgeScreen = edge.vertices.map((p) => w2sFn(p.x, p.y));
-              if (edgeScreen.length < 2)
-                continue;
-              ctx.beginPath();
-              ctx.moveTo(edgeScreen[0].x, edgeScreen[0].y);
-              for (let ei = 1; ei < edgeScreen.length; ei++)
-                ctx.lineTo(edgeScreen[ei].x, edgeScreen[ei].y);
-              ctx.stroke();
+            {
+              const borderColor = isDarkTheme ? brd.border.dark : brd.border.light;
+              ctx.strokeStyle = borderColor;
+              ctx.lineWidth = brd.borderWidth;
+              for (const edge of this.borderEdges) {
+                if (edge.edgeType !== "border")
+                  continue;
+                if (!continentZoneSet.has(edge.leftZone) && !continentZoneSet.has(edge.rightZone))
+                  continue;
+                const edgeScreen = edge.vertices.map((p) => w2sFn(p.x, p.y));
+                if (edgeScreen.length < 2)
+                  continue;
+                if (inkWobbleOn) {
+                  strokeWobblyPolyline(ctx, edgeScreen, inkAmpBase * 0.5, brd.borderWidth, hashCoords(edge.leftZone + 1e3, edge.rightZone + 1e3));
+                } else {
+                  ctx.beginPath();
+                  ctx.moveTo(edgeScreen[0].x, edgeScreen[0].y);
+                  for (let ei = 1; ei < edgeScreen.length; ei++)
+                    ctx.lineTo(edgeScreen[ei].x, edgeScreen[ei].y);
+                  ctx.stroke();
+                }
+              }
             }
             ctx.restore();
-            ctx.save();
-            ctx.beginPath();
-            ctx.moveTo(coastScreen[0].x, coastScreen[0].y);
-            for (let ci = 1; ci < coastScreen.length; ci++) {
-              ctx.lineTo(coastScreen[ci].x, coastScreen[ci].y);
+            {
+              const coastColor = isDarkTheme ? brd.coast.dark : brd.coast.light;
+              const wobbleAmp = inkAmpBase * 0.6;
+              const coastCentroid = { x: 0, y: 0 };
+              for (const p of coastScreen) {
+                coastCentroid.x += p.x;
+                coastCentroid.y += p.y;
+              }
+              coastCentroid.x /= coastScreen.length;
+              coastCentroid.y /= coastScreen.length;
+              if (decCfg.inkWobble && wobbleAmp > 0.05) {
+                ctx.save();
+                ctx.strokeStyle = coastColor;
+                ctx.shadowColor = coastColor;
+                ctx.shadowBlur = brd.coastGlow;
+                strokeWobblyPolyline(ctx, coastScreen, wobbleAmp, brd.coastWidth, hashCoords(continent.zoneIds[0] || 0, 999));
+                ctx.shadowBlur = 0;
+                if (zoom > 1.2) {
+                  ctx.globalAlpha = 0.25;
+                  const inset = Math.min(3, 1.5 * zoom);
+                  const innerCoast = coastScreen.map((p) => {
+                    const dx = coastCentroid.x - p.x, dy = coastCentroid.y - p.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist < 1)
+                      return p;
+                    const f = inset / dist;
+                    return { x: p.x + dx * f, y: p.y + dy * f };
+                  });
+                  strokeWobblyPolyline(ctx, innerCoast, wobbleAmp * 0.3, brd.coastWidth * 0.35, hashCoords(continent.zoneIds[0] || 0, 1999));
+                }
+                if (decCfg.coastHatch && zoom > 2) {
+                  ctx.globalAlpha = 0.12;
+                  ctx.fillStyle = coastColor;
+                  const stippleBand = 5;
+                  const rng = mulberry326(hashCoords(continent.zoneIds[0] || 0, 2999));
+                  ctx.beginPath();
+                  const step = Math.max(1, Math.floor(coastScreen.length / 60));
+                  for (let ci = 0; ci < coastScreen.length; ci += step) {
+                    const p = coastScreen[ci];
+                    const dx = p.x - coastCentroid.x, dy = p.y - coastCentroid.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist < 1)
+                      continue;
+                    const nx = dx / dist, ny = dy / dist;
+                    const bx = p.x + nx * stippleBand;
+                    const by = p.y + ny * stippleBand;
+                    const r = 0.3 + rng() * 0.2;
+                    ctx.moveTo(bx + r, by);
+                    ctx.arc(bx, by, r, 0, Math.PI * 2);
+                  }
+                  ctx.fill();
+                }
+                ctx.restore();
+              } else {
+                ctx.save();
+                ctx.beginPath();
+                ctx.moveTo(coastScreen[0].x, coastScreen[0].y);
+                for (let ci = 1; ci < coastScreen.length; ci++) {
+                  ctx.lineTo(coastScreen[ci].x, coastScreen[ci].y);
+                }
+                ctx.closePath();
+                ctx.shadowColor = coastColor;
+                ctx.shadowBlur = brd.coastGlow;
+                ctx.strokeStyle = coastColor;
+                ctx.lineWidth = brd.coastWidth;
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+                ctx.restore();
+              }
             }
-            ctx.closePath();
-            const coastColor = isDarkTheme ? "rgba(200,220,255,0.35)" : "rgba(40,60,100,0.35)";
-            ctx.shadowColor = coastColor;
-            ctx.shadowBlur = 10;
-            ctx.strokeStyle = coastColor;
-            ctx.lineWidth = 2;
-            ctx.stroke();
-            ctx.shadowBlur = 0;
-            ctx.restore();
           } else {
             for (const zone of memberZones) {
               if (zone.cellPolygons) {
@@ -11177,43 +12374,52 @@ var ChorographiaView = class extends import_obsidian6.ItemView {
             }
           }
         }
-        for (const zone of this.zones) {
-          if (!zone.cellPolygons || zone.cellPolygons.length === 0)
-            continue;
-          let cx = 0, cy = 0, count = 0;
-          for (const cell of zone.cellPolygons) {
-            for (const v of cell) {
-              cx += v.x;
-              cy += v.y;
-              count++;
+        {
+          const fonts = this.mapTheme.fonts;
+          for (const zone of this.zones) {
+            if (!zone.cellPolygons || zone.cellPolygons.length === 0)
+              continue;
+            let cx = 0, cy = 0, count = 0;
+            for (const cell of zone.cellPolygons) {
+              for (const v of cell) {
+                cx += v.x;
+                cy += v.y;
+                count++;
+              }
             }
+            if (count === 0)
+              continue;
+            cx /= count;
+            cy /= count;
+            const spt = w2sFn(cx, cy);
+            const zls = Math.round(this.plugin.settings.zoneLabelSize * this.exportLabelScale);
+            const zlo = this.plugin.settings.zoneLabelOpacity;
+            ctx.save();
+            ctx.font = `${fonts.zoneLabelWeight} ${zls}px ${fonts.zoneLabel}`;
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            const isCartStyle = this.mapTheme.decorative.compassStyle === "cartographic";
+            ctx.letterSpacing = isCartStyle ? "2.5px" : "1.5px";
+            const txt = zone.label.toUpperCase();
+            if (this.plugin.settings.labelOutline && !this.exportLabelOverride) {
+              ctx.strokeStyle = themeOutlineColor();
+              ctx.lineWidth = this.plugin.settings.labelOutlineWidth * this.exportLabelScale;
+              ctx.lineJoin = "round";
+              ctx.globalAlpha = zlo * globalZoneAlpha;
+              ctx.strokeText(txt, spt.x, spt.y);
+            }
+            ctx.fillStyle = `rgba(${hexToRgb(zone.color).join(",")},${zlo * globalZoneAlpha})`;
+            ctx.fillText(txt, spt.x, spt.y);
+            ctx.letterSpacing = "0px";
+            if (this.editMode) {
+              const tw = ctx.measureText(txt).width;
+              this.labelHitboxes.push({ type: "zone", zoneId: zone.id, x: spt.x - tw / 2, y: spt.y + zls / 2, w: tw, h: zls + 4 });
+            }
+            ctx.restore();
           }
-          if (count === 0)
-            continue;
-          cx /= count;
-          cy /= count;
-          const spt = w2sFn(cx, cy);
-          const zls = this.plugin.settings.zoneLabelSize;
-          const zlo = this.plugin.settings.zoneLabelOpacity;
-          ctx.save();
-          ctx.font = `600 ${zls}px var(--font-interface)`;
-          ctx.textAlign = "center";
-          ctx.textBaseline = "middle";
-          ctx.letterSpacing = "1.5px";
-          const txt = zone.label.toUpperCase();
-          if (this.plugin.settings.labelOutline) {
-            ctx.strokeStyle = themeOutlineColor();
-            ctx.lineWidth = this.plugin.settings.labelOutlineWidth;
-            ctx.lineJoin = "round";
-            ctx.globalAlpha = zlo * globalZoneAlpha;
-            ctx.strokeText(txt, spt.x, spt.y);
-          }
-          ctx.fillStyle = `rgba(${hexToRgb(zone.color).join(",")},${zlo * globalZoneAlpha})`;
-          ctx.fillText(txt, spt.x, spt.y);
-          ctx.letterSpacing = "0px";
-          ctx.restore();
         }
         if (subAlpha > 0.01) {
+          const fonts = this.mapTheme.fonts;
           for (const zone of this.zones) {
             if (!zone.subDomainCells || zone.subDomainCells.size <= 1)
               continue;
@@ -11241,27 +12447,32 @@ var ChorographiaView = class extends import_obsidian6.ItemView {
               cx /= count;
               cy /= count;
               const spt = w2sFn(cx, cy);
-              const subSize = Math.max(5, this.plugin.settings.zoneLabelSize - 2);
+              const subSize = Math.round(this.plugin.settings.subZoneLabelSize * this.exportLabelScale * 1.5);
+              const subLabelOpacity = this.plugin.settings.subZoneLabelOpacity;
               ctx.save();
-              ctx.font = `${subSize}px var(--font-interface)`;
+              ctx.font = `${subSize}px ${fonts.subZoneLabel}`;
               ctx.textAlign = "center";
               ctx.textBaseline = "middle";
               ctx.translate(spt.x, spt.y);
               ctx.transform(1, 0, -0.21, 1, 0, 0);
-              if (this.plugin.settings.labelOutline) {
+              if (this.plugin.settings.labelOutline && !this.exportLabelOverride) {
                 ctx.strokeStyle = themeOutlineColor();
-                ctx.lineWidth = this.plugin.settings.labelOutlineWidth;
+                ctx.lineWidth = this.plugin.settings.labelOutlineWidth * this.exportLabelScale;
                 ctx.lineJoin = "round";
-                ctx.globalAlpha = 0.4 * subAlpha;
+                ctx.globalAlpha = subLabelOpacity * subAlpha;
                 ctx.strokeText(sz.label, 0, 0);
               }
-              ctx.fillStyle = `rgba(${hexToRgb(zone.color).join(",")},${0.4 * subAlpha})`;
+              ctx.fillStyle = `rgba(${hexToRgb(zone.color).join(",")},${subLabelOpacity * subAlpha})`;
               ctx.fillText(sz.label, 0, 0);
+              if (this.editMode) {
+                const tw = ctx.measureText(sz.label).width;
+                this.labelHitboxes.push({ type: "subzone", zoneId: zone.id, subId: sz.id, x: spt.x - tw / 2, y: spt.y + subSize / 2, w: tw, h: subSize + 4 });
+              }
               ctx.restore();
             }
           }
         }
-        const continentLabelAlpha = Math.max(0, 1 - (zoom - 1) / 2);
+        const continentLabelAlpha = this.exportLabelOverride ? 0 : Math.max(0, 1 - (zoom - 1) / 2);
         if (continentLabelAlpha > 0.01) {
           for (const continent of this.continents) {
             if (continent.zoneIds.length <= 1)
@@ -11279,13 +12490,15 @@ var ChorographiaView = class extends import_obsidian6.ItemView {
             cx /= memberZones.length;
             cy /= memberZones.length;
             const spt = w2sFn(cx, cy);
-            const contSize = Math.round(this.plugin.settings.zoneLabelSize * 1.5);
+            const fonts = this.mapTheme.fonts;
+            const contSize = Math.round(this.plugin.settings.zoneLabelSize * 1.5 * this.exportLabelScale);
             ctx.save();
             ctx.globalAlpha = continentLabelAlpha;
-            ctx.font = `bold ${contSize}px var(--font-interface)`;
+            ctx.font = `${fonts.continentLabelWeight} ${contSize}px ${fonts.continentLabel}`;
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
-            ctx.letterSpacing = "3px";
+            const isCartStyle = this.mapTheme.decorative.compassStyle === "cartographic";
+            ctx.letterSpacing = isCartStyle ? "5px" : "3px";
             const contTxt = continent.label.toUpperCase();
             if (this.plugin.settings.labelOutline) {
               ctx.strokeStyle = isDarkTheme ? "rgba(0,0,0,0.5)" : "rgba(255,255,255,0.5)";
@@ -11293,18 +12506,22 @@ var ChorographiaView = class extends import_obsidian6.ItemView {
               ctx.lineJoin = "round";
               ctx.strokeText(contTxt, spt.x, spt.y - 20);
             }
-            ctx.fillStyle = isDarkTheme ? "rgba(200,220,255,0.4)" : "rgba(40,60,100,0.4)";
+            const brd = this.mapTheme.borders;
+            ctx.fillStyle = isDarkTheme ? brd.coast.dark : brd.coast.light;
             ctx.fillText(contTxt, spt.x, spt.y - 20);
             ctx.letterSpacing = "0px";
             ctx.restore();
           }
         }
       } else {
+        const fonts = this.mapTheme.fonts;
         const lcfg = {
-          zoneLabelSize: this.plugin.settings.zoneLabelSize,
+          zoneLabelSize: Math.round(this.plugin.settings.zoneLabelSize * this.exportLabelScale),
           zoneLabelOpacity: this.plugin.settings.zoneLabelOpacity,
           labelOutline: this.plugin.settings.labelOutline,
-          labelOutlineWidth: this.plugin.settings.labelOutlineWidth
+          labelOutlineWidth: this.plugin.settings.labelOutlineWidth,
+          fontFamily: fonts.zoneLabel,
+          fontWeight: fonts.zoneLabelWeight
         };
         for (const zone of this.zones) {
           drawZone(ctx, zone, w2sFn, globalZoneAlpha, false, isWorldmap, false, void 0, parentFillFade, lcfg);
@@ -11326,49 +12543,128 @@ var ChorographiaView = class extends import_obsidian6.ItemView {
       }
     }
     if (showLinks) {
-      ctx.save();
-      ctx.strokeStyle = th.linkStroke;
-      ctx.lineWidth = 1;
-      for (let i = 0; i < pts.length; i++) {
-        for (const link of pts[i].links) {
-          const j = idx.get(link);
-          if (j == null || j <= i)
+      const dec = this.mapTheme.decorative;
+      if (this.routeNetwork && dec.routeNetwork && this.routeNetwork.edges.length > 0) {
+        const rn = this.routeNetwork;
+        ctx.save();
+        ctx.globalAlpha = 0.45;
+        ctx.strokeStyle = th.linkStroke;
+        for (let ei = 0; ei < rn.edges.length; ei++) {
+          const edge = rn.edges[ei];
+          if (edge.traffic === 0)
             continue;
+          const s0 = scr[edge.from], s1 = scr[edge.to];
+          if (!s0 || !s1)
+            continue;
+          if (s0.x < -100 && s1.x < -100)
+            continue;
+          if (s0.x > W + 100 && s1.x > W + 100)
+            continue;
+          if (s0.y < -100 && s1.y < -100)
+            continue;
+          if (s0.y > H + 100 && s1.y > H + 100)
+            continue;
+          const cp = this.w2s(edge.controlPt.x, edge.controlPt.y);
+          const width = Math.max(0.5, Math.log(edge.traffic + 1) * 0.6 + 0.3);
+          ctx.lineWidth = width;
+          ctx.setLineDash(edge.isOcean ? [4, 3] : []);
           ctx.beginPath();
-          ctx.moveTo(scr[i].x, scr[i].y);
-          ctx.lineTo(scr[j].x, scr[j].y);
+          ctx.moveTo(s0.x, s0.y);
+          ctx.quadraticCurveTo(cp.x, cp.y, s1.x, s1.y);
           ctx.stroke();
         }
-      }
-      ctx.restore();
-    }
-    const fi = this.selectedIdx >= 0 ? this.selectedIdx : this.hoverIdx;
-    if (fi >= 0 && showLinks) {
-      ctx.save();
-      ctx.strokeStyle = "#BCDC2B";
-      ctx.lineWidth = 1.5;
-      ctx.globalAlpha = 0.7;
-      const fp = pts[fi];
-      for (const link of fp.links) {
-        const j = idx.get(link);
-        if (j == null)
-          continue;
-        ctx.beginPath();
-        ctx.moveTo(scr[fi].x, scr[fi].y);
-        ctx.lineTo(scr[j].x, scr[j].y);
-        ctx.stroke();
-      }
-      for (let i = 0; i < pts.length; i++) {
-        if (i === fi)
-          continue;
-        if (pts[i].links.includes(fp.path)) {
-          ctx.beginPath();
-          ctx.moveTo(scr[i].x, scr[i].y);
-          ctx.lineTo(scr[fi].x, scr[fi].y);
-          ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.restore();
+        const fi = this.selectedIdx >= 0 ? this.selectedIdx : this.hoverIdx;
+        if (fi >= 0) {
+          ctx.save();
+          ctx.strokeStyle = this.mapTheme.noteStyle.highlightEdge;
+          ctx.globalAlpha = 0.7;
+          const fp = pts[fi];
+          const highlightEdges = /* @__PURE__ */ new Set();
+          for (const link of fp.links) {
+            const j = idx.get(link);
+            if (j == null)
+              continue;
+            const key1 = `${fi}\u2192${j}`, key2 = `${j}\u2192${fi}`;
+            const path = rn.linkPaths.get(key1) || rn.linkPaths.get(key2);
+            if (path)
+              for (const ei of path)
+                highlightEdges.add(ei);
+          }
+          for (let i = 0; i < pts.length; i++) {
+            if (i === fi)
+              continue;
+            if (pts[i].links.includes(fp.path)) {
+              const key1 = `${i}\u2192${fi}`, key2 = `${fi}\u2192${i}`;
+              const path = rn.linkPaths.get(key1) || rn.linkPaths.get(key2);
+              if (path)
+                for (const ei of path)
+                  highlightEdges.add(ei);
+            }
+          }
+          for (const ei of highlightEdges) {
+            const edge = rn.edges[ei];
+            const s0 = scr[edge.from], s1 = scr[edge.to];
+            if (!s0 || !s1)
+              continue;
+            const cp = this.w2s(edge.controlPt.x, edge.controlPt.y);
+            const width = Math.max(1, Math.log(edge.traffic + 1) * 0.8 + 1);
+            ctx.lineWidth = width;
+            ctx.setLineDash(edge.isOcean ? [4, 3] : []);
+            ctx.beginPath();
+            ctx.moveTo(s0.x, s0.y);
+            ctx.quadraticCurveTo(cp.x, cp.y, s1.x, s1.y);
+            ctx.stroke();
+          }
+          ctx.setLineDash([]);
+          ctx.restore();
+        }
+      } else {
+        ctx.save();
+        ctx.strokeStyle = th.linkStroke;
+        ctx.lineWidth = 1;
+        for (let i = 0; i < pts.length; i++) {
+          for (const link of pts[i].links) {
+            const j = idx.get(link);
+            if (j == null || j <= i)
+              continue;
+            ctx.beginPath();
+            ctx.moveTo(scr[i].x, scr[i].y);
+            ctx.lineTo(scr[j].x, scr[j].y);
+            ctx.stroke();
+          }
+        }
+        ctx.restore();
+        const fi = this.selectedIdx >= 0 ? this.selectedIdx : this.hoverIdx;
+        if (fi >= 0) {
+          ctx.save();
+          ctx.strokeStyle = this.mapTheme.noteStyle.highlightEdge;
+          ctx.lineWidth = 1.5;
+          ctx.globalAlpha = 0.7;
+          const fp = pts[fi];
+          for (const link of fp.links) {
+            const j = idx.get(link);
+            if (j == null)
+              continue;
+            ctx.beginPath();
+            ctx.moveTo(scr[fi].x, scr[fi].y);
+            ctx.lineTo(scr[j].x, scr[j].y);
+            ctx.stroke();
+          }
+          for (let i = 0; i < pts.length; i++) {
+            if (i === fi)
+              continue;
+            if (pts[i].links.includes(fp.path)) {
+              ctx.beginPath();
+              ctx.moveTo(scr[i].x, scr[i].y);
+              ctx.lineTo(scr[fi].x, scr[fi].y);
+              ctx.stroke();
+            }
+          }
+          ctx.restore();
         }
       }
-      ctx.restore();
     }
     const baseR = Math.max(1.5, 1.5 * zoom);
     for (let i = 0; i < pts.length; i++) {
@@ -11391,7 +12687,10 @@ var ChorographiaView = class extends import_obsidian6.ItemView {
         ctx.arc(s.x, s.y, glowR, 0, Math.PI * 2);
         ctx.fill();
       }
-      if (isSem && pts[i].semA >= 0 && pts[i].semB >= 0 && pts[i].semA !== pts[i].semB) {
+      if (this.terrainTypes.length > i && this.terrainTypes[i]) {
+        const iconSize = Math.max(6, 4 * zoom);
+        drawTerrainIcon(ctx, this.terrainTypes[i], s.x, s.y, iconSize, this.color(pts[i]), alpha, pts[i].x, pts[i].y);
+      } else if (isSem && pts[i].semA >= 0 && pts[i].semB >= 0 && pts[i].semA !== pts[i].semB) {
         this.drawSemPt(ctx, s.x, s.y, r, pts[i], alpha);
       } else {
         ctx.beginPath();
@@ -11403,28 +12702,88 @@ var ChorographiaView = class extends import_obsidian6.ItemView {
       ctx.globalAlpha = 1;
     }
     if (this.selectedIdx >= 0) {
-      const s = scr[this.selectedIdx];
+      const sp = scr[this.selectedIdx];
+      const selColor = this.mapTheme.noteStyle.selectionRing;
       ctx.beginPath();
-      ctx.arc(s.x, s.y, baseR * 2.2, 0, Math.PI * 2);
-      ctx.strokeStyle = "#C9963B";
+      ctx.arc(sp.x, sp.y, baseR * 2.2, 0, Math.PI * 2);
+      ctx.strokeStyle = selColor;
       ctx.lineWidth = 1.5;
       ctx.stroke();
+      if (showLinks) {
+        ctx.save();
+        ctx.strokeStyle = selColor;
+        ctx.globalAlpha = 0.5;
+        ctx.lineWidth = 1;
+        const selP = pts[this.selectedIdx];
+        for (const link of selP.links) {
+          const j = idx.get(link);
+          if (j == null)
+            continue;
+          const sj = scr[j];
+          ctx.beginPath();
+          ctx.arc(sj.x, sj.y, baseR * 2, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+        for (let i = 0; i < pts.length; i++) {
+          if (i === this.selectedIdx)
+            continue;
+          if (pts[i].links.includes(selP.path)) {
+            const si = scr[i];
+            ctx.beginPath();
+            ctx.arc(si.x, si.y, baseR * 2, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+        }
+        ctx.restore();
+      }
     }
-    const labelAlpha = Math.min(1, Math.max(0, (zoom - 5) / 3)) * this.plugin.settings.noteTitleOpacity;
+    const labelAlpha = this.exportLabelOverride ? 1 : Math.min(1, Math.max(0, (zoom - 5) / 3)) * this.plugin.settings.noteTitleOpacity;
     if (labelAlpha > 0.01 && this.plugin.settings.showNoteTitles)
       this.drawGlobalLabels(ctx, pts, scr, labelAlpha, W, H);
-    if (zoom > 1.2 && this.plugin.settings.minimapCorner !== "off") {
+    if (this.regionSelectActive && this.regionStart && this.regionEnd) {
+      ctx.save();
+      const rx = Math.min(this.regionStart.x, this.regionEnd.x);
+      const ry = Math.min(this.regionStart.y, this.regionEnd.y);
+      const rw = Math.abs(this.regionEnd.x - this.regionStart.x);
+      const rh = Math.abs(this.regionEnd.y - this.regionStart.y);
+      ctx.strokeStyle = "#5AC6CE";
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 4]);
+      ctx.strokeRect(rx, ry, rw, rh);
+      ctx.fillStyle = "rgba(90, 198, 206, 0.08)";
+      ctx.fillRect(rx, ry, rw, rh);
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
+    if (this.regionSelectActive && this.regionWorld && !this.regionStart) {
+      ctx.save();
+      const s1 = this.w2s(this.regionWorld.x1, this.regionWorld.y1);
+      const s2 = this.w2s(this.regionWorld.x2, this.regionWorld.y2);
+      const rx = Math.min(s1.x, s2.x), ry = Math.min(s1.y, s2.y);
+      const rw = Math.abs(s2.x - s1.x), rh = Math.abs(s2.y - s1.y);
+      ctx.strokeStyle = "#5AC6CE";
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 4]);
+      ctx.strokeRect(rx, ry, rw, rh);
+      ctx.fillStyle = "rgba(90, 198, 206, 0.08)";
+      ctx.fillRect(rx, ry, rw, rh);
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
+    if ((zoom > 1.2 || this.exportLabelOverride) && this.plugin.settings.minimapCorner !== "off") {
       this.drawMinimap(ctx, W, H);
     }
+    this.drawCompassRose(ctx, W, H);
     if (this.hoverIdx >= 0 && labelAlpha < 0.5) {
       this.drawTooltip(ctx, scr[this.hoverIdx], pts[this.hoverIdx].title);
     }
   }
   // ---------- semantic point ----------
   drawSemPt(ctx, sx, sy, r, p, a) {
-    const cA = SEM_PALETTE3[p.semA % SEM_PALETTE3.length];
-    const cB = SEM_PALETTE3[p.semB % SEM_PALETTE3.length];
-    const split = SEM_SPLIT[p.semW] ?? 0.5;
+    const pal = this.mapTheme.palette;
+    const cA = pal.semantic[p.semA % pal.semantic.length];
+    const cB = pal.semantic[p.semB % pal.semantic.length];
+    const split = pal.semSplit[p.semW] ?? 0.5;
     const grad = ctx.createConicGradient(0, sx, sy);
     grad.addColorStop(0, cA);
     grad.addColorStop(split, cA);
@@ -11443,16 +12802,18 @@ var ChorographiaView = class extends import_obsidian6.ItemView {
   }
   // ---------- labels ----------
   drawGlobalLabels(ctx, pts, scr, alpha, W, H) {
-    const nts = this.plugin.settings.noteTitleSize;
+    const nts = Math.round(this.plugin.settings.noteTitleSize * this.exportLabelScale);
     const isDark = document.body.classList.contains("theme-dark");
     const outlineOn = this.plugin.settings.labelOutline;
-    const outlineW = this.plugin.settings.labelOutlineWidth;
+    const outlineW = this.plugin.settings.labelOutlineWidth * this.exportLabelScale;
+    const fonts = this.mapTheme.fonts;
     ctx.save();
     ctx.globalAlpha = alpha;
-    ctx.font = `${nts}px var(--font-interface)`;
+    ctx.font = `${nts}px ${fonts.noteTitle}`;
     ctx.fillStyle = this.theme.text;
     ctx.textAlign = "left";
-    if (outlineOn) {
+    const drawOutline = outlineOn && !this.exportLabelOverride;
+    if (drawOutline) {
       ctx.strokeStyle = isDark ? "rgba(10,14,26,0.9)" : "rgba(248,248,255,0.9)";
       ctx.lineWidth = outlineW;
       ctx.lineJoin = "round";
@@ -11462,17 +12823,337 @@ var ChorographiaView = class extends import_obsidian6.ItemView {
       if (s.x < -50 || s.x > W + 50 || s.y < -50 || s.y > H + 50)
         continue;
       const t = pts[i].title.length > 40 ? pts[i].title.slice(0, 37) + "..." : pts[i].title;
-      if (outlineOn)
+      if (drawOutline)
         ctx.strokeText(t, s.x + 4, s.y + 2);
       ctx.fillText(t, s.x + 4, s.y + 2);
     }
     ctx.restore();
   }
   // ---------- tooltip ----------
+  // ---------- grid lines ----------
+  drawGridLines(ctx, W, H) {
+    const dec = this.mapTheme.decorative;
+    if (!dec.gridLines)
+      return;
+    const isDark = document.body.classList.contains("theme-dark");
+    const color = isDark ? dec.gridColor.dark : dec.gridColor.light;
+    const spacing = dec.gridSpacing;
+    const isCartographic = dec.gridStyle === "cartographic";
+    const useWobble = dec.inkWobble;
+    const wobbleAmp = 0.3 * (dec.inkWobbleAmplitude || 1);
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 0.5;
+    ctx.globalAlpha = dec.gridOpacity;
+    for (let wx = -2; wx <= 2; wx += spacing) {
+      const s0 = this.w2s(wx, -2);
+      const s1 = this.w2s(wx, 2);
+      if (useWobble) {
+        strokeWobblyLine(ctx, s0.x, s0.y, s1.x, s1.y, wobbleAmp, 0.5, 10, hashCoords(wx, 0));
+      } else {
+        ctx.beginPath();
+        ctx.moveTo(s0.x, s0.y);
+        ctx.lineTo(s1.x, s1.y);
+        ctx.stroke();
+      }
+    }
+    for (let wy = -2; wy <= 2; wy += spacing) {
+      const s0 = this.w2s(-2, wy);
+      const s1 = this.w2s(2, wy);
+      if (useWobble) {
+        strokeWobblyLine(ctx, s0.x, s0.y, s1.x, s1.y, wobbleAmp, 0.5, 10, hashCoords(0, wy));
+      } else {
+        ctx.beginPath();
+        ctx.moveTo(s0.x, s0.y);
+        ctx.lineTo(s1.x, s1.y);
+        ctx.stroke();
+      }
+    }
+    if (isCartographic) {
+      ctx.fillStyle = color;
+      ctx.globalAlpha = dec.gridOpacity * 0.5;
+      ctx.beginPath();
+      for (let wx = -2; wx <= 2; wx += spacing) {
+        for (let wy = -2; wy <= 2; wy += spacing) {
+          const s = this.w2s(wx, wy);
+          if (s.x < 0 || s.x > W || s.y < 0 || s.y > H)
+            continue;
+          ctx.moveTo(s.x + 1.2, s.y);
+          ctx.arc(s.x, s.y, 1.2, 0, Math.PI * 2);
+        }
+      }
+      ctx.fill();
+    }
+    if (isCartographic) {
+      ctx.globalAlpha = dec.gridOpacity * 0.6;
+      const fonts = this.mapTheme.fonts;
+      ctx.font = `italic 7px ${fonts.noteTitle}`;
+      ctx.fillStyle = color;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "top";
+      for (let wx = -1; wx <= 1; wx += spacing) {
+        const s = this.w2s(wx, -1);
+        if (s.x > 10 && s.x < W - 10) {
+          const deg = Math.round((wx + 1) * 90);
+          ctx.fillText(`${deg}\xB0`, s.x, s.y + 2);
+        }
+      }
+      ctx.textAlign = "right";
+      ctx.textBaseline = "middle";
+      for (let wy = -1; wy <= 1; wy += spacing) {
+        const s = this.w2s(-1, wy);
+        if (s.y > 10 && s.y < H - 10) {
+          const deg = Math.round((wy + 1) * 90);
+          ctx.fillText(`${deg}\xB0`, s.x - 3, s.y);
+        }
+      }
+    }
+    if (dec.neatline) {
+      ctx.globalAlpha = dec.gridOpacity * 0.8;
+      ctx.strokeStyle = color;
+      const m = 12;
+      const gap = 4;
+      if (useWobble) {
+        ctx.lineWidth = 1.2;
+        const outerPts = [
+          { x: m, y: m },
+          { x: W - m, y: m },
+          { x: W - m, y: H - m },
+          { x: m, y: H - m },
+          { x: m, y: m }
+        ];
+        strokeWobblyPolyline(ctx, outerPts, wobbleAmp * 0.5, 1.2, 77777);
+        ctx.lineWidth = 0.6;
+        const innerPts = [
+          { x: m + gap, y: m + gap },
+          { x: W - m - gap, y: m + gap },
+          { x: W - m - gap, y: H - m - gap },
+          { x: m + gap, y: H - m - gap },
+          { x: m + gap, y: m + gap }
+        ];
+        strokeWobblyPolyline(ctx, innerPts, wobbleAmp * 0.3, 0.6, 88888);
+      } else {
+        ctx.lineWidth = 1.2;
+        ctx.strokeRect(m, m, W - 2 * m, H - 2 * m);
+        ctx.lineWidth = 0.6;
+        ctx.strokeRect(m + gap, m + gap, W - 2 * (m + gap), H - 2 * (m + gap));
+      }
+      ctx.lineWidth = 0.8;
+      for (let wx = -2; wx <= 2; wx += spacing) {
+        const s = this.w2s(wx, 0);
+        if (s.x > m && s.x < W - m) {
+          ctx.beginPath();
+          ctx.moveTo(s.x, m);
+          ctx.lineTo(s.x, m + gap);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(s.x, H - m - gap);
+          ctx.lineTo(s.x, H - m);
+          ctx.stroke();
+        }
+      }
+      for (let wy = -2; wy <= 2; wy += spacing) {
+        const s = this.w2s(0, wy);
+        if (s.y > m && s.y < H - m) {
+          ctx.beginPath();
+          ctx.moveTo(m, s.y);
+          ctx.lineTo(m + gap, s.y);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(W - m - gap, s.y);
+          ctx.lineTo(W - m, s.y);
+          ctx.stroke();
+        }
+      }
+    }
+    ctx.restore();
+  }
+  // ---------- compass rose ----------
+  drawCompassRose(ctx, W, H) {
+    const dec = this.mapTheme.decorative;
+    if (!dec.compassRose)
+      return;
+    const isDark = document.body.classList.contains("theme-dark");
+    const isCartographic = dec.compassStyle === "cartographic";
+    const size = isCartographic ? 60 : 40;
+    const margin = 20;
+    let cx, cy;
+    switch (dec.compassCorner) {
+      case "top-left":
+        cx = margin + size;
+        cy = margin + size;
+        break;
+      case "top-right":
+        cx = W - margin - size;
+        cy = margin + size;
+        break;
+      case "bottom-left":
+        cx = margin + size;
+        cy = H - margin - size;
+        break;
+      default:
+        cx = W - margin - size;
+        cy = H - margin - size;
+    }
+    const color = isDark ? "rgba(200,200,220,0.5)" : "rgba(60,60,80,0.5)";
+    const accentColor = isDark ? "rgba(200,200,220,0.7)" : "rgba(60,60,80,0.7)";
+    const darkHalf = isDark ? "rgba(200,200,220,0.55)" : "rgba(60,60,80,0.55)";
+    const lightHalf = isDark ? "rgba(200,200,220,0.2)" : "rgba(60,60,80,0.15)";
+    ctx.save();
+    ctx.translate(cx, cy);
+    if (isCartographic) {
+      const useWobble = dec.inkWobble;
+      const seed = 54321;
+      const drawStar = (dirs, getLen, getW) => {
+        for (let i = 0; i < dirs; i++) {
+          const angle = i * Math.PI * 2 / dirs - Math.PI / 2;
+          const len = getLen(i);
+          const w = getW(i);
+          const tipX = Math.cos(angle) * len;
+          const tipY = Math.sin(angle) * len;
+          const lx = Math.cos(angle - 0.08) * w;
+          const ly = Math.sin(angle - 0.08) * w;
+          const rx = Math.cos(angle + 0.08) * w;
+          const ry = Math.sin(angle + 0.08) * w;
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.lineTo(lx, ly);
+          ctx.lineTo(tipX, tipY);
+          ctx.closePath();
+          ctx.fillStyle = i === 0 ? accentColor : darkHalf;
+          ctx.fill();
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.lineTo(rx, ry);
+          ctx.lineTo(tipX, tipY);
+          ctx.closePath();
+          ctx.fillStyle = lightHalf;
+          ctx.fill();
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.lineTo(lx, ly);
+          ctx.lineTo(tipX, tipY);
+          ctx.lineTo(rx, ry);
+          ctx.closePath();
+          ctx.strokeStyle = color;
+          ctx.lineWidth = 0.3;
+          ctx.stroke();
+        }
+      };
+      drawStar(
+        16,
+        (i) => i % 4 === 0 ? size : i % 2 === 0 ? size * 0.6 : size * 0.35,
+        (i) => i % 4 === 0 ? 7 : i % 2 === 0 ? 4 : 2
+      );
+      ctx.save();
+      ctx.translate(0, -size - 4);
+      const fleurSize = size * 0.2;
+      ctx.fillStyle = accentColor;
+      ctx.beginPath();
+      ctx.moveTo(0, -fleurSize);
+      ctx.bezierCurveTo(fleurSize * 0.3, -fleurSize * 0.6, fleurSize * 0.2, 0, 0, fleurSize * 0.3);
+      ctx.bezierCurveTo(-fleurSize * 0.2, 0, -fleurSize * 0.3, -fleurSize * 0.6, 0, -fleurSize);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(-fleurSize * 0.15, 0);
+      ctx.bezierCurveTo(-fleurSize * 0.6, -fleurSize * 0.4, -fleurSize * 0.8, -fleurSize * 0.1, -fleurSize * 0.5, fleurSize * 0.3);
+      ctx.lineTo(-fleurSize * 0.1, fleurSize * 0.1);
+      ctx.closePath();
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(fleurSize * 0.15, 0);
+      ctx.bezierCurveTo(fleurSize * 0.6, -fleurSize * 0.4, fleurSize * 0.8, -fleurSize * 0.1, fleurSize * 0.5, fleurSize * 0.3);
+      ctx.lineTo(fleurSize * 0.1, fleurSize * 0.1);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+      ctx.strokeStyle = color;
+      const outerR = size * 0.82;
+      const innerR = size * 0.72;
+      for (const r of [outerR, innerR]) {
+        const segments = 36;
+        ctx.beginPath();
+        for (let j = 0; j <= segments; j++) {
+          const a = j / segments * Math.PI * 2;
+          const wobble = useWobble ? 1 + (mulberry326(seed + j * 17 + Math.round(r))() - 0.5) * 0.02 : 1;
+          const px = Math.cos(a) * r * wobble;
+          const py = Math.sin(a) * r * wobble;
+          if (j === 0)
+            ctx.moveTo(px, py);
+          else
+            ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        ctx.lineWidth = r === outerR ? 0.8 : 0.5;
+        ctx.stroke();
+      }
+      const fonts = this.mapTheme.fonts;
+      ctx.font = `italic bold 8px ${fonts.zoneLabel}`;
+      ctx.fillStyle = accentColor;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      const labelR = (outerR + innerR) / 2;
+      const labels = [["N", -Math.PI / 2], ["E", 0], ["S", Math.PI / 2], ["W", Math.PI]];
+      for (const [label, angle] of labels) {
+        if (label === "N")
+          continue;
+        ctx.fillText(label, Math.cos(angle) * labelR, Math.sin(angle) * labelR);
+      }
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 0.5;
+      for (let deg = 0; deg < 360; deg += 30) {
+        const a = deg * Math.PI / 180 - Math.PI / 2;
+        if (deg % 90 === 0)
+          continue;
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(a) * innerR, Math.sin(a) * innerR);
+        ctx.lineTo(Math.cos(a) * outerR, Math.sin(a) * outerR);
+        ctx.stroke();
+      }
+      ctx.beginPath();
+      ctx.arc(0, 0, 3.5, 0, Math.PI * 2);
+      ctx.fillStyle = color;
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(0, 0, 1.5, 0, Math.PI * 2);
+      ctx.fillStyle = isDark ? "rgba(0,0,0,0.8)" : "rgba(255,255,255,0.8)";
+      ctx.fill();
+    } else {
+      const points = [
+        [0, -size],
+        [size * 0.5, 0],
+        [0, size],
+        [-size * 0.5, 0]
+      ];
+      ctx.beginPath();
+      ctx.moveTo(points[0][0], points[0][1]);
+      for (let i = 1; i < points.length; i++)
+        ctx.lineTo(points[i][0], points[i][1]);
+      ctx.closePath();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(-4, 0);
+      ctx.lineTo(0, -size);
+      ctx.lineTo(4, 0);
+      ctx.closePath();
+      ctx.fillStyle = accentColor;
+      ctx.fill();
+      const fonts = this.mapTheme.fonts;
+      ctx.font = `bold 10px ${fonts.zoneLabel}`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "bottom";
+      ctx.fillStyle = accentColor;
+      ctx.fillText("N", 0, -size - 4);
+    }
+    ctx.restore();
+  }
   drawTooltip(ctx, s, title) {
     const th = this.theme;
     const label = title.length > 60 ? title.slice(0, 57) + "..." : title;
-    ctx.font = "12px var(--font-interface)";
+    ctx.font = `12px ${this.mapTheme.fonts.noteTitle}`;
     const tw = ctx.measureText(label).width;
     const pad = 7;
     const tx = s.x + 14, ty = s.y - 14;
@@ -11500,8 +13181,9 @@ var ChorographiaView = class extends import_obsidian6.ItemView {
   }
   // ===================== minimap =====================
   drawMinimap(ctx, W, H) {
-    const size = Math.min(160, Math.min(W, H) * 0.28);
-    const pad = 14;
+    const baseSize = Math.min(160, Math.min(W, H) * 0.28);
+    const size = this.exportLabelOverride ? baseSize * 5 : baseSize;
+    const pad = this.exportLabelOverride ? 40 : 14;
     const corner = this.plugin.settings.minimapCorner;
     let ox, oy;
     if (corner === "top-left") {
@@ -11643,6 +13325,15 @@ var ChorographiaView = class extends import_obsidian6.ItemView {
     const c = this.canvas;
     c.addEventListener("mousedown", (e) => {
       this.cancelAnimation();
+      if (this.regionSelectActive) {
+        const rect = c.getBoundingClientRect();
+        const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+        this.regionStart = { x: mx, y: my };
+        this.regionEnd = { x: mx, y: my };
+        this.regionWorld = null;
+        c.style.cursor = "crosshair";
+        return;
+      }
       this.dragging = true;
       this.dragStartX = e.clientX;
       this.dragStartY = e.clientY;
@@ -11651,6 +13342,12 @@ var ChorographiaView = class extends import_obsidian6.ItemView {
       c.style.cursor = "grabbing";
     });
     c.addEventListener("mousemove", (e) => {
+      if (this.regionSelectActive && this.regionStart) {
+        const rect2 = c.getBoundingClientRect();
+        this.regionEnd = { x: e.clientX - rect2.left, y: e.clientY - rect2.top };
+        this.draw();
+        return;
+      }
       if (this.dragging) {
         this.panX = this.dragPanX + (e.clientX - this.dragStartX);
         this.panY = this.dragPanY + (e.clientY - this.dragStartY);
@@ -11671,11 +13368,30 @@ var ChorographiaView = class extends import_obsidian6.ItemView {
       }
       if (best !== this.hoverIdx) {
         this.hoverIdx = best;
-        c.style.cursor = best >= 0 ? "pointer" : "grab";
+        c.style.cursor = this.regionSelectActive ? "crosshair" : best >= 0 ? "pointer" : "grab";
         this.draw();
       }
     });
     c.addEventListener("mouseup", (e) => {
+      if (this.regionSelectActive && this.regionStart && this.regionEnd) {
+        const dx2 = this.regionEnd.x - this.regionStart.x;
+        const dy2 = this.regionEnd.y - this.regionStart.y;
+        if (Math.abs(dx2) > 10 && Math.abs(dy2) > 10) {
+          const w1 = this.s2w(this.regionStart.x, this.regionStart.y);
+          const w2 = this.s2w(this.regionEnd.x, this.regionEnd.y);
+          this.regionWorld = { x1: w1.x, y1: w1.y, x2: w2.x, y2: w2.y };
+          const exportBtn = this.exportPanel.querySelector(".chorographia-export-btn-primary");
+          if (exportBtn)
+            exportBtn.disabled = false;
+          const hint = this.containerEl.querySelector(".chorographia-region-hint");
+          if (hint)
+            hint.remove();
+        }
+        this.regionStart = null;
+        this.regionEnd = null;
+        this.draw();
+        return;
+      }
       const was = this.dragging;
       this.dragging = false;
       c.style.cursor = this.hoverIdx >= 0 ? "pointer" : "grab";
@@ -11688,6 +13404,19 @@ var ChorographiaView = class extends import_obsidian6.ItemView {
       if (this.hoverIdx !== -1) {
         this.hoverIdx = -1;
         this.draw();
+      }
+    });
+    c.addEventListener("dblclick", (e) => {
+      if (!this.editMode)
+        return;
+      const rect = c.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
+      for (const hb of this.labelHitboxes) {
+        if (mx >= hb.x && mx <= hb.x + hb.w && my >= hb.y - hb.h && my <= hb.y) {
+          this.startLabelEdit(hb, rect);
+          break;
+        }
       }
     });
     c.addEventListener("wheel", (e) => {
@@ -11797,43 +13526,110 @@ var ChorographiaView = class extends import_obsidian6.ItemView {
     const z = this.zoom.toFixed(1);
     this.statusEl.textContent = `${t} notes | zoom ${z}x`;
   }
+  startLabelEdit(hb, canvasRect) {
+    if (this.editingLabel) {
+      this.editingLabel.el.remove();
+      this.editingLabel = null;
+    }
+    const container = this.containerEl.children[1];
+    const input = container.createEl("input", { cls: "chorographia-label-edit" });
+    const currentLabel = hb.type === "zone" ? this.zones.find((z) => z.id === hb.zoneId)?.label || "" : this.subZonesMap.get(hb.zoneId)?.find((sz) => sz.id === hb.subId)?.label || "";
+    input.value = currentLabel;
+    input.style.left = `${hb.x}px`;
+    input.style.top = `${hb.y - hb.h - 4}px`;
+    input.style.width = `${Math.max(80, hb.w + 20)}px`;
+    input.focus();
+    input.select();
+    const commit = () => {
+      const val = input.value.trim();
+      if (val && val !== currentLabel) {
+        if (!this.plugin.cache.userLabelOverrides)
+          this.plugin.cache.userLabelOverrides = {};
+        if (!this.plugin.cache.userSubLabelOverrides)
+          this.plugin.cache.userSubLabelOverrides = {};
+        if (hb.type === "zone") {
+          this.plugin.cache.userLabelOverrides[hb.zoneId] = val;
+          const zone = this.zones.find((z) => z.id === hb.zoneId);
+          if (zone)
+            zone.label = val;
+        } else if (hb.subId != null) {
+          if (!this.plugin.cache.userSubLabelOverrides[hb.zoneId]) {
+            this.plugin.cache.userSubLabelOverrides[hb.zoneId] = {};
+          }
+          this.plugin.cache.userSubLabelOverrides[hb.zoneId][hb.subId] = val;
+          const sub = this.subZonesMap.get(hb.zoneId)?.find((sz) => sz.id === hb.subId);
+          if (sub)
+            sub.label = val;
+        }
+        this.plugin.saveCache();
+        this.draw();
+      }
+      input.remove();
+      this.editingLabel = null;
+    };
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        commit();
+      }
+      if (e.key === "Escape") {
+        input.remove();
+        this.editingLabel = null;
+      }
+    });
+    input.addEventListener("blur", commit);
+    this.editingLabel = { type: hb.type, zoneId: hb.zoneId, subId: hb.subId, el: input };
+  }
   async refresh() {
+    this.applyThemeBackground();
     await this.loadPoints();
     this.resizeCanvas();
     this.draw();
   }
 };
 
+// src/snapshots.ts
+var SETTINGS_KEYS = [
+  "zoneGranularity",
+  "zoneStyle",
+  "colorMode",
+  "activeTheme",
+  "worldmapSeaLevel",
+  "worldmapUnity",
+  "worldmapRuggedness",
+  "mapLocked",
+  "showZones",
+  "showSubZones",
+  "zoneLabelSize",
+  "zoneLabelOpacity",
+  "noteTitleSize",
+  "noteTitleOpacity",
+  "labelOutline",
+  "labelOutlineWidth"
+];
+function serializeSnapshot(name, settings, cache) {
+  const subset = {};
+  for (const key of SETTINGS_KEYS) {
+    subset[key] = settings[key];
+  }
+  return {
+    version: 1,
+    name,
+    timestamp: Date.now(),
+    settings: subset,
+    cache: JSON.parse(JSON.stringify(cache))
+  };
+}
+function deserializeSnapshot(data) {
+  if (!data || typeof data !== "object")
+    return null;
+  const obj = data;
+  if (obj.version !== 1 || !obj.name || !obj.cache || !obj.cache.notes)
+    return null;
+  return obj;
+}
+
 // src/main.ts
-var SEM_PALETTE4 = [
-  "#00D6FF",
-  "#B9FF00",
-  "#FF7A00",
-  "#A855F7",
-  "#00FFB3",
-  "#FF3DB8",
-  "#00FFA3",
-  "#FFD400",
-  "#00F5D4",
-  "#FF9A3D",
-  "#7CFFCB",
-  "#B8C0FF"
-];
-var FOLDER_COLORS2 = [
-  "#8E9AAF",
-  "#C9963B",
-  "#B28DFF",
-  "#5AC6CE",
-  "#B8541A",
-  "#9AB2AF",
-  "#BCDC2B",
-  "#FF7A00",
-  "#A855F7",
-  "#00D6FF",
-  "#00FFB3",
-  "#FF3DB8"
-];
-var SEM_SPLIT2 = { 1: 0.8, 2: 0.65, 3: 0.5, 4: 0.35, 5: 0.2 };
 function hexToRgb2(hex) {
   const n = parseInt(hex.slice(1), 16);
   return [n >> 16 & 255, n >> 8 & 255, n & 255];
@@ -11846,18 +13642,19 @@ function lerpHex(c1, c2, t) {
   const b = Math.round(b1 + (b2 - b1) * t);
   return "#" + (1 << 24 | r << 16 | g << 8 | b).toString(16).slice(1);
 }
-function noteColor(note, folderColors) {
+function noteColor(note, folderColors, theme) {
+  const pal = theme.palette;
   const semA = note.semA ?? -1;
   const semB = note.semB ?? -1;
   const semW = note.semW ?? 3;
   if (semA >= 0) {
-    const cA = SEM_PALETTE4[semA % SEM_PALETTE4.length];
+    const cA = pal.semantic[semA % pal.semantic.length];
     if (semB < 0 || semA === semB)
       return cA;
-    const cB = SEM_PALETTE4[semB % SEM_PALETTE4.length];
-    return lerpHex(cA, cB, 1 - (SEM_SPLIT2[semW] ?? 0.5));
+    const cB = pal.semantic[semB % pal.semantic.length];
+    return lerpHex(cA, cB, 1 - (pal.semSplit[semW] ?? 0.5));
   }
-  return folderColors.get(note.folder) || FOLDER_COLORS2[0];
+  return folderColors.get(note.folder) || pal.folder[0];
 }
 var ChorographiaPlugin = class extends import_obsidian7.Plugin {
   constructor() {
@@ -11865,6 +13662,9 @@ var ChorographiaPlugin = class extends import_obsidian7.Plugin {
     this.settings = DEFAULT_SETTINGS;
     this.cache = { notes: {} };
     this.explorerStyleEl = null;
+  }
+  getActiveTheme() {
+    return getThemeById(this.settings.activeTheme);
   }
   async onload() {
     await this.loadSettings();
@@ -12073,6 +13873,54 @@ var ChorographiaPlugin = class extends import_obsidian7.Plugin {
       await leaf.view.refresh();
     }
   }
+  // ---------- Snapshots ----------
+  get savesDir() {
+    return `${this.manifest.dir}/saves`;
+  }
+  async saveSnapshot(name) {
+    const snapshot = serializeSnapshot(name, this.settings, this.cache);
+    const dir = this.savesDir;
+    if (!await this.app.vault.adapter.exists(dir)) {
+      await this.app.vault.adapter.mkdir(dir);
+    }
+    const filename = `${dir}/${name.replace(/[^a-zA-Z0-9_-]/g, "_")}.json`;
+    await this.app.vault.adapter.write(filename, JSON.stringify(snapshot));
+  }
+  async loadSnapshot(filename) {
+    const data = await this.app.vault.adapter.read(filename);
+    const snapshot = deserializeSnapshot(JSON.parse(data));
+    if (!snapshot)
+      throw new Error("Invalid snapshot file");
+    this.cache = snapshot.cache;
+    Object.assign(this.settings, snapshot.settings);
+    await this.saveCache();
+    await this.saveSettings();
+    this.updateExplorerDots();
+    await this.refreshMapViews();
+  }
+  async listSnapshots() {
+    const dir = this.savesDir;
+    if (!await this.app.vault.adapter.exists(dir))
+      return [];
+    const listing = await this.app.vault.adapter.list(dir);
+    const results = [];
+    for (const f of listing.files) {
+      if (!f.endsWith(".json"))
+        continue;
+      try {
+        const raw = await this.app.vault.adapter.read(f);
+        const obj = JSON.parse(raw);
+        if (obj.version === 1 && obj.name) {
+          results.push({ name: obj.name, path: f, timestamp: obj.timestamp || 0 });
+        }
+      } catch {
+      }
+    }
+    return results.sort((a, b) => b.timestamp - a.timestamp);
+  }
+  async deleteSnapshot(filename) {
+    await this.app.vault.adapter.remove(filename);
+  }
   updateExplorerDots() {
     this.removeExplorerDots();
     if (!this.settings.showExplorerDots)
@@ -12087,8 +13935,9 @@ var ChorographiaPlugin = class extends import_obsidian7.Plugin {
     }
     const folderArr = [...folders].sort();
     const folderColors = /* @__PURE__ */ new Map();
+    const folderPal = this.getActiveTheme().palette.folder;
     folderArr.forEach((f, i) => {
-      folderColors.set(f, FOLDER_COLORS2[i % FOLDER_COLORS2.length]);
+      folderColors.set(f, folderPal[i % folderPal.length]);
     });
     const dotSize = 9;
     const dotLeft = 104 + 6;
@@ -12098,7 +13947,7 @@ var ChorographiaPlugin = class extends import_obsidian7.Plugin {
       `.chorographia-dots .nav-file-title[data-path] .nav-file-title-content { padding-left: ${totalPad}px !important; }`
     );
     for (const [path, note] of Object.entries(notes)) {
-      const color = noteColor(note, folderColors);
+      const color = noteColor(note, folderColors, this.getActiveTheme());
       const escaped = CSS.escape(path);
       rules.push(
         `.nav-file-title[data-path="${escaped}"] .nav-file-title-content { background-image: radial-gradient(circle, transparent 0 58%, var(--background-primary) 60% 100%), radial-gradient(circle at 40% 35%, rgba(255,255,255,0.15) 0 45%, transparent 78%), radial-gradient(circle, ${color} 50%, transparent 51%); background-size: ${dotSize}px ${dotSize}px; background-position: ${dotLeft}px 50%; background-repeat: no-repeat; }`

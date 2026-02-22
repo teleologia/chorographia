@@ -13,19 +13,10 @@ import { computeLayout, interpolateNewPoints } from "./layout";
 import { kMeans, computeSemanticAssignments } from "./kmeans";
 import { decodeFloat32, encodeFloat32 } from "./cache";
 import { ChorographiaView, VIEW_TYPE } from "./view";
+import { MapTheme, getThemeById } from "./theme";
+import { serializeSnapshot, deserializeSnapshot, MapSnapshot } from "./snapshots";
 
-// Same palette as view.ts — used for explorer dots
-const SEM_PALETTE = [
-	"#00D6FF", "#B9FF00", "#FF7A00", "#A855F7",
-	"#00FFB3", "#FF3DB8", "#00FFA3", "#FFD400",
-	"#00F5D4", "#FF9A3D", "#7CFFCB", "#B8C0FF",
-];
-const FOLDER_COLORS = [
-	"#8E9AAF", "#C9963B", "#B28DFF", "#5AC6CE", "#B8541A",
-	"#9AB2AF", "#BCDC2B", "#FF7A00", "#A855F7", "#00D6FF",
-	"#00FFB3", "#FF3DB8",
-];
-const SEM_SPLIT: Record<number, number> = { 1: 0.80, 2: 0.65, 3: 0.50, 4: 0.35, 5: 0.20 };
+// palettes are now sourced from the active MapTheme — see theme.ts
 
 function hexToRgb(hex: string): [number, number, number] {
 	const n = parseInt(hex.slice(1), 16);
@@ -40,23 +31,28 @@ function lerpHex(c1: string, c2: string, t: number): string {
 	return "#" + ((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1);
 }
 
-function noteColor(note: NoteCache, folderColors: Map<string, string>): string {
+function noteColor(note: NoteCache, folderColors: Map<string, string>, theme: MapTheme): string {
+	const pal = theme.palette;
 	const semA = note.semA ?? -1;
 	const semB = note.semB ?? -1;
 	const semW = note.semW ?? 3;
 	if (semA >= 0) {
-		const cA = SEM_PALETTE[semA % SEM_PALETTE.length];
+		const cA = pal.semantic[semA % pal.semantic.length];
 		if (semB < 0 || semA === semB) return cA;
-		const cB = SEM_PALETTE[semB % SEM_PALETTE.length];
-		return lerpHex(cA, cB, 1 - (SEM_SPLIT[semW] ?? 0.5));
+		const cB = pal.semantic[semB % pal.semantic.length];
+		return lerpHex(cA, cB, 1 - (pal.semSplit[semW] ?? 0.5));
 	}
-	return folderColors.get(note.folder) || FOLDER_COLORS[0];
+	return folderColors.get(note.folder) || pal.folder[0];
 }
 
 export default class ChorographiaPlugin extends Plugin {
 	settings: ChorographiaSettings = DEFAULT_SETTINGS;
 	cache: PluginCache = { notes: {} };
 	private explorerStyleEl: HTMLStyleElement | null = null;
+
+	getActiveTheme(): MapTheme {
+		return getThemeById(this.settings.activeTheme);
+	}
 
 	async onload(): Promise<void> {
 		await this.loadSettings();
@@ -324,6 +320,56 @@ export default class ChorographiaPlugin extends Plugin {
 		}
 	}
 
+	// ---------- Snapshots ----------
+
+	private get savesDir(): string {
+		return `${this.manifest.dir}/saves`;
+	}
+
+	async saveSnapshot(name: string): Promise<void> {
+		const snapshot = serializeSnapshot(name, this.settings, this.cache);
+		const dir = this.savesDir;
+		if (!await this.app.vault.adapter.exists(dir)) {
+			await this.app.vault.adapter.mkdir(dir);
+		}
+		const filename = `${dir}/${name.replace(/[^a-zA-Z0-9_-]/g, "_")}.json`;
+		await this.app.vault.adapter.write(filename, JSON.stringify(snapshot));
+	}
+
+	async loadSnapshot(filename: string): Promise<void> {
+		const data = await this.app.vault.adapter.read(filename);
+		const snapshot = deserializeSnapshot(JSON.parse(data));
+		if (!snapshot) throw new Error("Invalid snapshot file");
+		this.cache = snapshot.cache;
+		Object.assign(this.settings, snapshot.settings);
+		await this.saveCache();
+		await this.saveSettings();
+		this.updateExplorerDots();
+		await this.refreshMapViews();
+	}
+
+	async listSnapshots(): Promise<{ name: string; path: string; timestamp: number }[]> {
+		const dir = this.savesDir;
+		if (!await this.app.vault.adapter.exists(dir)) return [];
+		const listing = await this.app.vault.adapter.list(dir);
+		const results: { name: string; path: string; timestamp: number }[] = [];
+		for (const f of listing.files) {
+			if (!f.endsWith(".json")) continue;
+			try {
+				const raw = await this.app.vault.adapter.read(f);
+				const obj = JSON.parse(raw);
+				if (obj.version === 1 && obj.name) {
+					results.push({ name: obj.name, path: f, timestamp: obj.timestamp || 0 });
+				}
+			} catch { /* skip corrupt files */ }
+		}
+		return results.sort((a, b) => b.timestamp - a.timestamp);
+	}
+
+	async deleteSnapshot(filename: string): Promise<void> {
+		await this.app.vault.adapter.remove(filename);
+	}
+
 	updateExplorerDots(): void {
 		this.removeExplorerDots();
 		if (!this.settings.showExplorerDots) return;
@@ -338,8 +384,9 @@ export default class ChorographiaPlugin extends Plugin {
 		}
 		const folderArr = [...folders].sort();
 		const folderColors = new Map<string, string>();
+		const folderPal = this.getActiveTheme().palette.folder;
 		folderArr.forEach((f, i) => {
-			folderColors.set(f, FOLDER_COLORS[i % FOLDER_COLORS.length]);
+			folderColors.set(f, folderPal[i % folderPal.length]);
 		});
 
 		// Build CSS rules — render dot as background-image on .nav-file-title-content
@@ -357,7 +404,7 @@ export default class ChorographiaPlugin extends Plugin {
 		);
 
 		for (const [path, note] of Object.entries(notes)) {
-			const color = noteColor(note, folderColors);
+			const color = noteColor(note, folderColors, this.getActiveTheme());
 			const escaped = CSS.escape(path);
 			rules.push(
 				`.nav-file-title[data-path="${escaped}"] .nav-file-title-content { ` +
