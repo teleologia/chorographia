@@ -104,7 +104,7 @@ export class ChorographiaSettingTab extends PluginSettingTab {
 	private addEmbedBatchSizeSetting(
 		containerEl: HTMLElement,
 		description: string,
-		value: number,
+		getValue: () => number,
 		fallback: number,
 		setValue: (next: number) => void
 	): void {
@@ -114,12 +114,18 @@ export class ChorographiaSettingTab extends PluginSettingTab {
 			.addText((text) =>
 				text
 					.setPlaceholder(String(fallback))
-					.setValue(String(value))
+					.setValue(String(getValue()))
 					.onChange(async (raw) => {
+						if (raw.trim() === "") return;
 						const parsed = Number(raw);
 						if (!Number.isFinite(parsed)) return;
-						setValue(clampEmbedBatchSize(parsed, fallback));
+						const normalized = clampEmbedBatchSize(parsed, fallback);
+						setValue(normalized);
 						await this.plugin.saveSettings();
+						const normalizedStr = String(normalized);
+						if (text.inputEl.value !== normalizedStr) {
+							text.inputEl.value = normalizedStr;
+						}
 					})
 					.then((t) => {
 						t.inputEl.type = "number";
@@ -127,6 +133,9 @@ export class ChorographiaSettingTab extends PluginSettingTab {
 						t.inputEl.max = String(EMBED_BATCH_SIZE_MAX);
 						t.inputEl.step = "1";
 						t.inputEl.style.width = "80px";
+						t.inputEl.addEventListener("blur", () => {
+							t.inputEl.value = String(getValue());
+						});
 					})
 			);
 	}
@@ -244,7 +253,7 @@ export class ChorographiaSettingTab extends PluginSettingTab {
 			this.addEmbedBatchSizeSetting(
 				containerEl,
 				"Notes per Ollama embedding request (1-100). Lower values are gentler on constrained hardware and rate limits; higher values reduce total API calls.",
-				this.plugin.settings.ollamaEmbedBatchSize,
+				() => this.plugin.settings.ollamaEmbedBatchSize,
 				DEFAULT_SETTINGS.ollamaEmbedBatchSize,
 				(next) => {
 					this.plugin.settings.ollamaEmbedBatchSize = next;
@@ -265,7 +274,7 @@ export class ChorographiaSettingTab extends PluginSettingTab {
 			this.addEmbedBatchSizeSetting(
 				containerEl,
 				"Notes per OpenAI embedding request (1-100). Lower values help with strict rate limits; higher values reduce total API calls.",
-				this.plugin.settings.openaiEmbedBatchSize,
+				() => this.plugin.settings.openaiEmbedBatchSize,
 				DEFAULT_SETTINGS.openaiEmbedBatchSize,
 				(next) => {
 					this.plugin.settings.openaiEmbedBatchSize = next;
@@ -286,7 +295,7 @@ export class ChorographiaSettingTab extends PluginSettingTab {
 			this.addEmbedBatchSizeSetting(
 				containerEl,
 				"Notes per OpenRouter embedding request (1-100). Lower values improve reliability under tighter limits; higher values reduce total API calls.",
-				this.plugin.settings.openrouterEmbedBatchSize,
+				() => this.plugin.settings.openrouterEmbedBatchSize,
 				DEFAULT_SETTINGS.openrouterEmbedBatchSize,
 				(next) => {
 					this.plugin.settings.openrouterEmbedBatchSize = next;

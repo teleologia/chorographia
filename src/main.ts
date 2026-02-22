@@ -120,18 +120,28 @@ export default class ChorographiaPlugin extends Plugin {
 		if (data?.settings) {
 			this.settings = { ...DEFAULT_SETTINGS, ...data.settings };
 		}
-		this.settings.ollamaEmbedBatchSize = clampEmbedBatchSize(
+		const normalizedOllamaBatchSize = clampEmbedBatchSize(
 			this.settings.ollamaEmbedBatchSize,
 			DEFAULT_SETTINGS.ollamaEmbedBatchSize
 		);
-		this.settings.openaiEmbedBatchSize = clampEmbedBatchSize(
+		const normalizedOpenAIBatchSize = clampEmbedBatchSize(
 			this.settings.openaiEmbedBatchSize,
 			DEFAULT_SETTINGS.openaiEmbedBatchSize
 		);
-		this.settings.openrouterEmbedBatchSize = clampEmbedBatchSize(
+		const normalizedOpenRouterBatchSize = clampEmbedBatchSize(
 			this.settings.openrouterEmbedBatchSize,
 			DEFAULT_SETTINGS.openrouterEmbedBatchSize
 		);
+		const needsSettingsSave =
+			normalizedOllamaBatchSize !== this.settings.ollamaEmbedBatchSize ||
+			normalizedOpenAIBatchSize !== this.settings.openaiEmbedBatchSize ||
+			normalizedOpenRouterBatchSize !== this.settings.openrouterEmbedBatchSize;
+		this.settings.ollamaEmbedBatchSize = normalizedOllamaBatchSize;
+		this.settings.openaiEmbedBatchSize = normalizedOpenAIBatchSize;
+		this.settings.openrouterEmbedBatchSize = normalizedOpenRouterBatchSize;
+		if (needsSettingsSave) {
+			await this.saveSettings();
+		}
 	}
 
 	async saveSettings(): Promise<void> {
@@ -292,8 +302,9 @@ export default class ChorographiaPlugin extends Plugin {
 		} catch (err) {
 			const elapsed = ((performance.now() - pipelineStart) / 1000).toFixed(1);
 			const message = err instanceof Error ? err.message : String(err);
+			const batchHint = `Try lowering Embedding > Batch size (currently ${batchSize}).`;
 			console.error(`[Chorographia] [${modelName}] Pipeline FAILED after ${elapsed}s:`, err);
-			new Notice(`Chorographia: Embedding failed - ${message}`);
+			new Notice(`Chorographia: Embedding failed - ${message}. ${batchHint}`);
 			return;
 		}
 
