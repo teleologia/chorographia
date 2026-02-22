@@ -5,16 +5,29 @@ export type ColorMode = "semantic" | "folder" | "type" | "cat";
 
 export type MinimapCorner = "off" | "top-left" | "top-right" | "bottom-left" | "bottom-right";
 
+export const EMBED_BATCH_SIZE_MIN = 1;
+export const EMBED_BATCH_SIZE_MAX = 100;
+const DEFAULT_EMBED_BATCH_SIZE = 50;
+
+export function clampEmbedBatchSize(value: number, fallback = DEFAULT_EMBED_BATCH_SIZE): number {
+	const n = Number(value);
+	if (!Number.isFinite(n)) return fallback;
+	return Math.min(EMBED_BATCH_SIZE_MAX, Math.max(EMBED_BATCH_SIZE_MIN, Math.round(n)));
+}
+
 export interface ChorographiaSettings {
 	embeddingProvider: "ollama" | "openai" | "openrouter";
 	ollamaUrl: string;
 	ollamaEmbedModel: string;
+	ollamaEmbedBatchSize: number;
 	ollamaLlmModel: string;
 	llmProvider: "ollama" | "openai" | "openrouter";
 	openaiApiKey: string;
 	embeddingModel: string;
+	openaiEmbedBatchSize: number;
 	openrouterApiKey: string;
 	openrouterEmbedModel: string;
+	openrouterEmbedBatchSize: number;
 	openrouterLlmModel: string;
 	includeGlobs: string;
 	excludeGlobs: string;
@@ -45,12 +58,15 @@ export const DEFAULT_SETTINGS: ChorographiaSettings = {
 	embeddingProvider: "ollama",
 	ollamaUrl: "http://localhost:11434",
 	ollamaEmbedModel: "qwen3-embedding",
+	ollamaEmbedBatchSize: DEFAULT_EMBED_BATCH_SIZE,
 	ollamaLlmModel: "qwen3:8b",
 	llmProvider: "ollama",
 	openaiApiKey: "",
 	embeddingModel: "text-embedding-3-large",
+	openaiEmbedBatchSize: DEFAULT_EMBED_BATCH_SIZE,
 	openrouterApiKey: "",
 	openrouterEmbedModel: "openai/text-embedding-3-small",
+	openrouterEmbedBatchSize: DEFAULT_EMBED_BATCH_SIZE,
 	openrouterLlmModel: "google/gemini-2.0-flash-001",
 	includeGlobs: "**/*.md",
 	excludeGlobs: "templates/**",
@@ -83,6 +99,66 @@ export class ChorographiaSettingTab extends PluginSettingTab {
 	constructor(app: App, plugin: ChorographiaPlugin) {
 		super(app, plugin);
 		this.plugin = plugin;
+	}
+
+	private addEmbedBatchSizeSetting(
+		containerEl: HTMLElement,
+		description: string,
+		getValue: () => number,
+		fallback: number,
+		setValue: (next: number) => void
+	): void {
+		let saveTimer: number | null = null;
+		const scheduleSave = () => {
+			if (saveTimer != null) {
+				window.clearTimeout(saveTimer);
+			}
+			saveTimer = window.setTimeout(() => {
+				saveTimer = null;
+				void this.plugin.saveSettings();
+			}, 200);
+		};
+		const flushSave = () => {
+			if (saveTimer == null) return;
+			window.clearTimeout(saveTimer);
+			saveTimer = null;
+			void this.plugin.saveSettings();
+		};
+
+		new Setting(containerEl)
+			.setName("Batch size")
+			.setDesc(description)
+			.addText((text) =>
+				text
+					.setPlaceholder(String(fallback))
+					.setValue(String(getValue()))
+					.onChange(async (raw) => {
+						if (raw.trim() === "") return;
+						const parsed = Number(raw);
+						if (!Number.isFinite(parsed)) return;
+						const current = getValue();
+						const normalized = clampEmbedBatchSize(parsed, fallback);
+						if (normalized !== current) {
+							setValue(normalized);
+							scheduleSave();
+						}
+						const normalizedStr = String(normalized);
+						if (text.inputEl.value !== normalizedStr) {
+							text.inputEl.value = normalizedStr;
+						}
+					})
+					.then((t) => {
+						t.inputEl.type = "number";
+						t.inputEl.min = String(EMBED_BATCH_SIZE_MIN);
+						t.inputEl.max = String(EMBED_BATCH_SIZE_MAX);
+						t.inputEl.step = "1";
+						t.inputEl.style.width = "80px";
+						t.inputEl.addEventListener("blur", () => {
+							t.inputEl.value = String(getValue());
+							flushSave();
+						});
+					})
+			);
 	}
 
 	display(): void {
@@ -195,6 +271,15 @@ export class ChorographiaSettingTab extends PluginSettingTab {
 							await this.plugin.saveSettings();
 						})
 				);
+			this.addEmbedBatchSizeSetting(
+				containerEl,
+				"Notes per Ollama embedding request (1-100). Lower values are gentler on constrained hardware and rate limits; higher values reduce total API calls.",
+				() => this.plugin.settings.ollamaEmbedBatchSize,
+				DEFAULT_SETTINGS.ollamaEmbedBatchSize,
+				(next) => {
+					this.plugin.settings.ollamaEmbedBatchSize = next;
+				}
+			);
 		} else if (this.plugin.settings.embeddingProvider === "openai") {
 			new Setting(containerEl)
 				.setName("Embedding model")
@@ -207,6 +292,15 @@ export class ChorographiaSettingTab extends PluginSettingTab {
 							await this.plugin.saveSettings();
 						})
 				);
+			this.addEmbedBatchSizeSetting(
+				containerEl,
+				"Notes per OpenAI embedding request (1-100). Lower values help with strict rate limits; higher values reduce total API calls.",
+				() => this.plugin.settings.openaiEmbedBatchSize,
+				DEFAULT_SETTINGS.openaiEmbedBatchSize,
+				(next) => {
+					this.plugin.settings.openaiEmbedBatchSize = next;
+				}
+			);
 		} else if (this.plugin.settings.embeddingProvider === "openrouter") {
 			new Setting(containerEl)
 				.setName("Embedding model")
@@ -219,6 +313,15 @@ export class ChorographiaSettingTab extends PluginSettingTab {
 							await this.plugin.saveSettings();
 						})
 				);
+			this.addEmbedBatchSizeSetting(
+				containerEl,
+				"Notes per OpenRouter embedding request (1-100). Lower values improve reliability under tighter limits; higher values reduce total API calls.",
+				() => this.plugin.settings.openrouterEmbedBatchSize,
+				DEFAULT_SETTINGS.openrouterEmbedBatchSize,
+				(next) => {
+					this.plugin.settings.openrouterEmbedBatchSize = next;
+				}
+			);
 		}
 
 		new Setting(containerEl)
@@ -608,17 +711,16 @@ export class ChorographiaSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName("Re-embed changed notes")
 			.setDesc("Index notes and compute embeddings for new/changed notes.")
-			.addButton((btn) =>
-				btn.setButtonText("Run").onClick(async () => {
-					btn.setDisabled(true);
-					btn.setButtonText("Running...");
-					try {
-						await this.plugin.runEmbedPipeline();
-						new Notice("Chorographia: Embedding complete.");
-					} catch (e: any) {
-						new Notice("Chorographia: " + e.message);
-					}
-					btn.setDisabled(false);
+				.addButton((btn) =>
+					btn.setButtonText("Run").onClick(async () => {
+						btn.setDisabled(true);
+						btn.setButtonText("Running...");
+						try {
+							await this.plugin.runEmbedPipeline();
+						} catch (e: any) {
+							new Notice("Chorographia: " + e.message);
+						}
+						btn.setDisabled(false);
 					btn.setButtonText("Run");
 				})
 			);

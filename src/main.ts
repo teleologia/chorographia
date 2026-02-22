@@ -3,6 +3,7 @@ import {
 	ChorographiaSettings,
 	DEFAULT_SETTINGS,
 	ChorographiaSettingTab,
+	clampEmbedBatchSize,
 } from "./settings";
 import { PluginCache, NoteCache } from "./cache";
 import { indexVault } from "./indexer";
@@ -119,6 +120,28 @@ export default class ChorographiaPlugin extends Plugin {
 		if (data?.settings) {
 			this.settings = { ...DEFAULT_SETTINGS, ...data.settings };
 		}
+		const normalizedOllamaBatchSize = clampEmbedBatchSize(
+			this.settings.ollamaEmbedBatchSize,
+			DEFAULT_SETTINGS.ollamaEmbedBatchSize
+		);
+		const normalizedOpenAIBatchSize = clampEmbedBatchSize(
+			this.settings.openaiEmbedBatchSize,
+			DEFAULT_SETTINGS.openaiEmbedBatchSize
+		);
+		const normalizedOpenRouterBatchSize = clampEmbedBatchSize(
+			this.settings.openrouterEmbedBatchSize,
+			DEFAULT_SETTINGS.openrouterEmbedBatchSize
+		);
+		const needsSettingsSave =
+			normalizedOllamaBatchSize !== this.settings.ollamaEmbedBatchSize ||
+			normalizedOpenAIBatchSize !== this.settings.openaiEmbedBatchSize ||
+			normalizedOpenRouterBatchSize !== this.settings.openrouterEmbedBatchSize;
+		this.settings.ollamaEmbedBatchSize = normalizedOllamaBatchSize;
+		this.settings.openaiEmbedBatchSize = normalizedOpenAIBatchSize;
+		this.settings.openrouterEmbedBatchSize = normalizedOpenRouterBatchSize;
+		if (needsSettingsSave) {
+			await this.saveSettings();
+		}
 	}
 
 	async saveSettings(): Promise<void> {
@@ -153,12 +176,25 @@ export default class ChorographiaPlugin extends Plugin {
 	}
 
 	async runEmbedPipeline(): Promise<void> {
+		const pipelineStart = performance.now();
+		const provider = this.settings.embeddingProvider;
+		const modelName = provider === "ollama"
+			? this.settings.ollamaEmbedModel
+			: provider === "openai"
+				? this.settings.embeddingModel
+				: this.settings.openrouterEmbedModel;
+		if (provider === "ollama") {
+			console.log(`[Chorographia] Pipeline started | provider: ${provider} | model: ${modelName} | url: ${this.settings.ollamaUrl}`);
+		} else {
+			console.log(`[Chorographia] Pipeline started | provider: ${provider} | model: ${modelName}`);
+		}
+
 		// Validate per-provider requirements
-		if (this.settings.embeddingProvider === "openai" && !this.settings.openaiApiKey) {
+		if (provider === "openai" && !this.settings.openaiApiKey) {
 			new Notice("Chorographia: Set your OpenAI API key in settings first.");
 			return;
 		}
-		if (this.settings.embeddingProvider === "openrouter" && !this.settings.openrouterApiKey) {
+		if (provider === "openrouter" && !this.settings.openrouterApiKey) {
 			new Notice("Chorographia: Set your OpenRouter API key in settings first.");
 			return;
 		}
@@ -172,14 +208,18 @@ export default class ChorographiaPlugin extends Plugin {
 			.map((g) => g.trim())
 			.filter(Boolean);
 
+		console.log(`[Chorographia] Indexing vault | include: ${globs.join(", ")} | exclude: ${excludeGlobs.join(", ")} | maxNotes: ${this.settings.maxNotes}`);
 		new Notice("Chorographia: Indexing vault...");
+		const indexStart = performance.now();
 		const notes = await indexVault(
 			this.app.vault,
 			globs,
 			excludeGlobs,
 			this.settings.maxNotes
 		);
+		const indexElapsed = ((performance.now() - indexStart) / 1000).toFixed(1);
 		new Notice(`Chorographia: Found ${notes.length} notes.`);
+		console.log(`[Chorographia] Indexing complete in ${indexElapsed}s | ${notes.length} notes found | modelString: ${this.embeddingModelString}`);
 
 		// Determine which notes need (re-)embedding
 		const modelStr = this.embeddingModelString;
@@ -213,6 +253,7 @@ export default class ChorographiaPlugin extends Plugin {
 		}
 
 		if (toEmbed.length === 0) {
+			console.log(`[Chorographia] All ${notes.length} notes up to date (fully cached)`);
 			new Notice("Chorographia: All notes up to date.");
 			await this.saveCache();
 			this.refreshMapViews();
@@ -220,28 +261,55 @@ export default class ChorographiaPlugin extends Plugin {
 			return;
 		}
 
+		console.log(`[Chorographia] ${toEmbed.length} notes need embedding, ${notes.length - toEmbed.length} cached`);
 		new Notice(
 			`Chorographia: Embedding ${toEmbed.length} notes...`
 		);
+		const batchSize = provider === "ollama"
+			? clampEmbedBatchSize(this.settings.ollamaEmbedBatchSize, DEFAULT_SETTINGS.ollamaEmbedBatchSize)
+			: provider === "openai"
+				? clampEmbedBatchSize(this.settings.openaiEmbedBatchSize, DEFAULT_SETTINGS.openaiEmbedBatchSize)
+				: clampEmbedBatchSize(this.settings.openrouterEmbedBatchSize, DEFAULT_SETTINGS.openrouterEmbedBatchSize);
+		console.log(`[Chorographia] [${modelName}] Using batch size ${batchSize}`);
 
 		const onProgress = (done: number, total: number) => {
-			new Notice(`Chorographia: Embedded ${done}/${total}`);
+			const pct = Math.round((done / total) * 100);
+			const elapsedSec = (performance.now() - pipelineStart) / 1000;
+			const safeElapsed = Math.max(elapsedSec, 0.001);
+			const rate = done / safeElapsed;
+			const rateStr = rate < 0.1 ? rate.toFixed(2) : rate.toFixed(1);
+			const eta = done > 0 && rate > 0 ? Math.round((total - done) / rate) : "?";
+			console.log(
+				`[Chorographia] [${modelName}] Progress: ${done}/${total} (${pct}%) | ${elapsedSec.toFixed(1)}s elapsed | ~${rateStr} notes/s | ETA ~${eta}s`
+			);
+			new Notice(`Chorographia: Embedded ${done}/${total} (${pct}%)`);
 		};
 
-		let results: import("./openai").EmbedResult[];
-		switch (this.settings.embeddingProvider) {
-			case "ollama":
-				results = await embedTextsOllama(toEmbed, this.settings.ollamaUrl, this.settings.ollamaEmbedModel, onProgress);
-				break;
-			case "openai":
-				results = await embedTexts(toEmbed, this.settings.openaiApiKey, this.settings.embeddingModel, onProgress);
-				break;
-			case "openrouter":
-				results = await embedTextsOpenRouter(toEmbed, this.settings.openrouterApiKey, this.settings.openrouterEmbedModel, onProgress);
-				break;
+		let results: import("./openai").EmbedResult[] = [];
+		try {
+			switch (provider) {
+				case "ollama":
+					results = await embedTextsOllama(toEmbed, this.settings.ollamaUrl, this.settings.ollamaEmbedModel, onProgress, batchSize);
+					break;
+				case "openai":
+					results = await embedTexts(toEmbed, this.settings.openaiApiKey, this.settings.embeddingModel, onProgress, batchSize);
+					break;
+				case "openrouter":
+					results = await embedTextsOpenRouter(toEmbed, this.settings.openrouterApiKey, this.settings.openrouterEmbedModel, onProgress, batchSize);
+					break;
+			}
+			console.log(`[Chorographia] [${modelName}] Embedding phase complete | ${results.length} results`);
+		} catch (err) {
+			const elapsed = ((performance.now() - pipelineStart) / 1000).toFixed(1);
+			const message = err instanceof Error ? err.message : String(err);
+			const batchHint = `If this looks like a request-size or rate-limit error, try lowering Embedding > Batch size (currently ${batchSize}).`;
+			console.error(`[Chorographia] [${modelName}] Pipeline FAILED after ${elapsed}s:`, err);
+			new Notice(`Chorographia: Embedding failed - ${message}. ${batchHint}`);
+			return;
 		}
 
 		// Update cache with new embeddings
+		console.log(`[Chorographia] Caching ${results.length} embedding results...`);
 		for (const r of results) {
 			const note = notes.find((n) => n.path === r.path)!;
 			this.cache.notes[r.path] = {
@@ -272,6 +340,7 @@ export default class ChorographiaPlugin extends Plugin {
 		}
 
 		// Invalidate zone cache when embeddings change
+		console.log("[Chorographia] Computing zones...");
 		if (this.settings.mapLocked) {
 			this.preserveAndInvalidateZones();
 		} else {
@@ -279,13 +348,19 @@ export default class ChorographiaPlugin extends Plugin {
 		}
 
 		// Compute semantic colors from k-means clustering
+		console.log(`[Chorographia] Computing semantic colors (locked: ${this.settings.mapLocked})...`);
+		const colorStart = performance.now();
 		if (this.settings.mapLocked) {
 			this.computeSemanticColorsLocked();
 		} else {
 			await this.computeSemanticColors();
 		}
+		console.log(`[Chorographia] Semantic colors computed in ${((performance.now() - colorStart) / 1000).toFixed(1)}s`);
 
+		console.log("[Chorographia] Saving cache...");
+		const saveStart = performance.now();
 		await this.saveCache();
+		console.log(`[Chorographia] Cache saved in ${((performance.now() - saveStart) / 1000).toFixed(1)}s`);
 		this.refreshMapViews();
 		this.updateExplorerDots();
 		new Notice(`Chorographia: Embedding complete (${results.length} new).`);
@@ -297,13 +372,21 @@ export default class ChorographiaPlugin extends Plugin {
 		const hasNewWithoutCoords = this.settings.mapLocked &&
 			Object.values(this.cache.notes).some((n) => n.embedding && n.x == null);
 		if (!hasLayout || hasNewWithoutCoords) {
+			console.log(`[Chorographia] Running UMAP layout compute (hasLayout: ${hasLayout}, newWithoutCoords: ${hasNewWithoutCoords})...`);
+			const layoutStart = performance.now();
 			await this.runLayoutCompute();
+			console.log(`[Chorographia] Layout compute complete in ${((performance.now() - layoutStart) / 1000).toFixed(1)}s`);
 			// Auto-enable lock after first successful layout
 			if (!hasLayout && !this.settings.mapLocked) {
 				this.settings.mapLocked = true;
 				await this.saveSettings();
 			}
+		} else {
+			console.log("[Chorographia] Skipping layout compute (existing layout found)");
 		}
+
+		const totalElapsed = ((performance.now() - pipelineStart) / 1000).toFixed(1);
+		console.log(`[Chorographia] Pipeline complete in ${totalElapsed}s | ${results.length} embedded, ${notes.length - results.length} cached`);
 	}
 
 	async runZoneNaming(): Promise<void> {
