@@ -214,17 +214,25 @@ export class ChorographiaSettingTab extends PluginSettingTab {
 			new Setting(containerEl)
 				.setName("Batch size")
 				.setDesc("Notes per Ollama embedding request (1-100). Lower values reduce per-request load; higher values reduce request count.")
-				.addSlider((sl) =>
-					sl
-						.setLimits(EMBED_BATCH_SIZE_MIN, EMBED_BATCH_SIZE_MAX, 1)
-						.setValue(this.plugin.settings.ollamaEmbedBatchSize)
-						.setDynamicTooltip()
+				.addText((text) =>
+					text
+						.setPlaceholder(String(DEFAULT_SETTINGS.ollamaEmbedBatchSize))
+						.setValue(String(this.plugin.settings.ollamaEmbedBatchSize))
 						.onChange(async (value) => {
+							const parsed = parseInt(value, 10);
+							if (isNaN(parsed)) return;
 							this.plugin.settings.ollamaEmbedBatchSize = clampEmbedBatchSize(
-								value,
+								parsed,
 								DEFAULT_SETTINGS.ollamaEmbedBatchSize
 							);
 							await this.plugin.saveSettings();
+						})
+						.then((t) => {
+							t.inputEl.type = "number";
+							t.inputEl.min = String(EMBED_BATCH_SIZE_MIN);
+							t.inputEl.max = String(EMBED_BATCH_SIZE_MAX);
+							t.inputEl.step = "1";
+							t.inputEl.style.width = "80px";
 						})
 				);
 		} else if (this.plugin.settings.embeddingProvider === "openai") {
@@ -242,17 +250,25 @@ export class ChorographiaSettingTab extends PluginSettingTab {
 			new Setting(containerEl)
 				.setName("Batch size")
 				.setDesc("Notes per OpenAI embedding request (1-100). Lower values can help with strict rate limits.")
-				.addSlider((sl) =>
-					sl
-						.setLimits(EMBED_BATCH_SIZE_MIN, EMBED_BATCH_SIZE_MAX, 1)
-						.setValue(this.plugin.settings.openaiEmbedBatchSize)
-						.setDynamicTooltip()
+				.addText((text) =>
+					text
+						.setPlaceholder(String(DEFAULT_SETTINGS.openaiEmbedBatchSize))
+						.setValue(String(this.plugin.settings.openaiEmbedBatchSize))
 						.onChange(async (value) => {
+							const parsed = parseInt(value, 10);
+							if (isNaN(parsed)) return;
 							this.plugin.settings.openaiEmbedBatchSize = clampEmbedBatchSize(
-								value,
+								parsed,
 								DEFAULT_SETTINGS.openaiEmbedBatchSize
 							);
 							await this.plugin.saveSettings();
+						})
+						.then((t) => {
+							t.inputEl.type = "number";
+							t.inputEl.min = String(EMBED_BATCH_SIZE_MIN);
+							t.inputEl.max = String(EMBED_BATCH_SIZE_MAX);
+							t.inputEl.step = "1";
+							t.inputEl.style.width = "80px";
 						})
 				);
 		} else if (this.plugin.settings.embeddingProvider === "openrouter") {
@@ -270,17 +286,25 @@ export class ChorographiaSettingTab extends PluginSettingTab {
 			new Setting(containerEl)
 				.setName("Batch size")
 				.setDesc("Notes per OpenRouter embedding request (1-100). Lower values can improve reliability on constrained endpoints.")
-				.addSlider((sl) =>
-					sl
-						.setLimits(EMBED_BATCH_SIZE_MIN, EMBED_BATCH_SIZE_MAX, 1)
-						.setValue(this.plugin.settings.openrouterEmbedBatchSize)
-						.setDynamicTooltip()
+				.addText((text) =>
+					text
+						.setPlaceholder(String(DEFAULT_SETTINGS.openrouterEmbedBatchSize))
+						.setValue(String(this.plugin.settings.openrouterEmbedBatchSize))
 						.onChange(async (value) => {
+							const parsed = parseInt(value, 10);
+							if (isNaN(parsed)) return;
 							this.plugin.settings.openrouterEmbedBatchSize = clampEmbedBatchSize(
-								value,
+								parsed,
 								DEFAULT_SETTINGS.openrouterEmbedBatchSize
 							);
 							await this.plugin.saveSettings();
+						})
+						.then((t) => {
+							t.inputEl.type = "number";
+							t.inputEl.min = String(EMBED_BATCH_SIZE_MIN);
+							t.inputEl.max = String(EMBED_BATCH_SIZE_MAX);
+							t.inputEl.step = "1";
+							t.inputEl.style.width = "80px";
 						})
 				);
 		}
