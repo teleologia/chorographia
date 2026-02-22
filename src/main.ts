@@ -3,6 +3,7 @@ import {
 	ChorographiaSettings,
 	DEFAULT_SETTINGS,
 	ChorographiaSettingTab,
+	clampEmbedBatchSize,
 } from "./settings";
 import { PluginCache, NoteCache } from "./cache";
 import { indexVault } from "./indexer";
@@ -119,6 +120,18 @@ export default class ChorographiaPlugin extends Plugin {
 		if (data?.settings) {
 			this.settings = { ...DEFAULT_SETTINGS, ...data.settings };
 		}
+		this.settings.ollamaEmbedBatchSize = clampEmbedBatchSize(
+			this.settings.ollamaEmbedBatchSize,
+			DEFAULT_SETTINGS.ollamaEmbedBatchSize
+		);
+		this.settings.openaiEmbedBatchSize = clampEmbedBatchSize(
+			this.settings.openaiEmbedBatchSize,
+			DEFAULT_SETTINGS.openaiEmbedBatchSize
+		);
+		this.settings.openrouterEmbedBatchSize = clampEmbedBatchSize(
+			this.settings.openrouterEmbedBatchSize,
+			DEFAULT_SETTINGS.openrouterEmbedBatchSize
+		);
 	}
 
 	async saveSettings(): Promise<void> {
@@ -242,6 +255,12 @@ export default class ChorographiaPlugin extends Plugin {
 		new Notice(
 			`Chorographia: Embedding ${toEmbed.length} notes...`
 		);
+		const batchSize = provider === "ollama"
+			? clampEmbedBatchSize(this.settings.ollamaEmbedBatchSize, DEFAULT_SETTINGS.ollamaEmbedBatchSize)
+			: provider === "openai"
+				? clampEmbedBatchSize(this.settings.openaiEmbedBatchSize, DEFAULT_SETTINGS.openaiEmbedBatchSize)
+				: clampEmbedBatchSize(this.settings.openrouterEmbedBatchSize, DEFAULT_SETTINGS.openrouterEmbedBatchSize);
+		console.log(`[Chorographia] [${modelName}] Using batch size ${batchSize}`);
 
 		const onProgress = (done: number, total: number) => {
 			const pct = Math.round((done / total) * 100);
@@ -260,13 +279,13 @@ export default class ChorographiaPlugin extends Plugin {
 		try {
 			switch (provider) {
 				case "ollama":
-					results = await embedTextsOllama(toEmbed, this.settings.ollamaUrl, this.settings.ollamaEmbedModel, onProgress);
+					results = await embedTextsOllama(toEmbed, this.settings.ollamaUrl, this.settings.ollamaEmbedModel, onProgress, batchSize);
 					break;
 				case "openai":
-					results = await embedTexts(toEmbed, this.settings.openaiApiKey, this.settings.embeddingModel, onProgress);
+					results = await embedTexts(toEmbed, this.settings.openaiApiKey, this.settings.embeddingModel, onProgress, batchSize);
 					break;
 				case "openrouter":
-					results = await embedTextsOpenRouter(toEmbed, this.settings.openrouterApiKey, this.settings.openrouterEmbedModel, onProgress);
+					results = await embedTextsOpenRouter(toEmbed, this.settings.openrouterApiKey, this.settings.openrouterEmbedModel, onProgress, batchSize);
 					break;
 			}
 			console.log(`[Chorographia] [${modelName}] Embedding phase complete | ${results.length} results`);

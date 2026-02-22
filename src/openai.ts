@@ -1,7 +1,6 @@
 import { requestUrl } from "obsidian";
 import { encodeFloat32 } from "./cache";
 
-const BATCH_SIZE = 50;
 const DELAY_MS = 200;
 
 export interface EmbedResult {
@@ -13,14 +12,16 @@ export async function embedTexts(
 	texts: { path: string; text: string }[],
 	apiKey: string,
 	model: string,
-	onProgress?: (done: number, total: number) => void
+	onProgress?: (done: number, total: number) => void,
+	batchSize = 50
 ): Promise<EmbedResult[]> {
 	if (!apiKey) throw new Error("OpenAI API key not set.");
+	const step = Math.max(1, Math.floor(batchSize));
 	const results: EmbedResult[] = [];
 	const skipped: string[] = [];
 
-	for (let i = 0; i < texts.length; i += BATCH_SIZE) {
-		const batch = texts.slice(i, i + BATCH_SIZE);
+	for (let i = 0; i < texts.length; i += step) {
+		const batch = texts.slice(i, i + step);
 
 		try {
 			const batchResults = await embedBatch(batch, apiKey, model);
@@ -43,10 +44,10 @@ export async function embedTexts(
 			}
 		}
 
-		onProgress?.(Math.min(i + BATCH_SIZE, texts.length), texts.length);
+		onProgress?.(Math.min(i + step, texts.length), texts.length);
 
 		// Rate-limit delay between batches
-		if (i + BATCH_SIZE < texts.length) {
+		if (i + step < texts.length) {
 			await sleep(DELAY_MS);
 		}
 	}

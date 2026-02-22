@@ -2,18 +2,18 @@ import { requestUrl } from "obsidian";
 import { encodeFloat32 } from "./cache";
 import type { EmbedResult } from "./openai";
 
-const BATCH_SIZE = 50;
-
 export async function embedTextsOllama(
 	texts: { path: string; text: string }[],
 	baseUrl: string,
 	model: string,
-	onProgress?: (done: number, total: number) => void
+	onProgress?: (done: number, total: number) => void,
+	batchSize = 50
 ): Promise<EmbedResult[]> {
+	const step = Math.max(1, Math.floor(batchSize));
 	const results: EmbedResult[] = [];
 
-	for (let i = 0; i < texts.length; i += BATCH_SIZE) {
-		const batch = texts.slice(i, i + BATCH_SIZE);
+	for (let i = 0; i < texts.length; i += step) {
+		const batch = texts.slice(i, i + step);
 		const resp = await requestUrl({
 			url: `${baseUrl}/api/embed`,
 			method: "POST",
@@ -38,7 +38,7 @@ export async function embedTextsOllama(
 			});
 		}
 
-		onProgress?.(Math.min(i + BATCH_SIZE, texts.length), texts.length);
+		onProgress?.(Math.min(i + step, texts.length), texts.length);
 	}
 
 	return results;
