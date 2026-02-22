@@ -213,7 +213,7 @@ export class ChorographiaSettingTab extends PluginSettingTab {
 				);
 			new Setting(containerEl)
 				.setName("Batch size")
-				.setDesc("Notes per Ollama embedding request (1-100). Lower values reduce per-request load; higher values reduce request count.")
+				.setDesc("Notes per Ollama embedding request (1-100). Lower values are gentler on constrained hardware and rate limits; higher values reduce total API calls.")
 				.addText((text) =>
 					text
 						.setPlaceholder(String(DEFAULT_SETTINGS.ollamaEmbedBatchSize))
@@ -249,7 +249,7 @@ export class ChorographiaSettingTab extends PluginSettingTab {
 				);
 			new Setting(containerEl)
 				.setName("Batch size")
-				.setDesc("Notes per OpenAI embedding request (1-100). Lower values can help with strict rate limits.")
+				.setDesc("Notes per OpenAI embedding request (1-100). Lower values help with strict rate limits; higher values reduce total API calls.")
 				.addText((text) =>
 					text
 						.setPlaceholder(String(DEFAULT_SETTINGS.openaiEmbedBatchSize))
@@ -285,7 +285,7 @@ export class ChorographiaSettingTab extends PluginSettingTab {
 				);
 			new Setting(containerEl)
 				.setName("Batch size")
-				.setDesc("Notes per OpenRouter embedding request (1-100). Lower values can improve reliability on constrained endpoints.")
+				.setDesc("Notes per OpenRouter embedding request (1-100). Lower values improve reliability under tighter limits; higher values reduce total API calls.")
 				.addText((text) =>
 					text
 						.setPlaceholder(String(DEFAULT_SETTINGS.openrouterEmbedBatchSize))
