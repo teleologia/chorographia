@@ -302,7 +302,7 @@ export default class ChorographiaPlugin extends Plugin {
 		} catch (err) {
 			const elapsed = ((performance.now() - pipelineStart) / 1000).toFixed(1);
 			const message = err instanceof Error ? err.message : String(err);
-			const batchHint = `Try lowering Embedding > Batch size (currently ${batchSize}).`;
+			const batchHint = `If this looks like a request-size or rate-limit error, try lowering Embedding > Batch size (currently ${batchSize}).`;
 			console.error(`[Chorographia] [${modelName}] Pipeline FAILED after ${elapsed}s:`, err);
 			new Notice(`Chorographia: Embedding failed - ${message}. ${batchHint}`);
 			return;

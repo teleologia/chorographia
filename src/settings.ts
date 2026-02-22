@@ -108,6 +108,24 @@ export class ChorographiaSettingTab extends PluginSettingTab {
 		fallback: number,
 		setValue: (next: number) => void
 	): void {
+		let saveTimer: number | null = null;
+		const scheduleSave = () => {
+			if (saveTimer != null) {
+				window.clearTimeout(saveTimer);
+			}
+			saveTimer = window.setTimeout(() => {
+				saveTimer = null;
+				void this.plugin.saveSettings();
+			}, 200);
+		};
+		const flushSave = () => {
+			if (saveTimer != null) {
+				window.clearTimeout(saveTimer);
+				saveTimer = null;
+			}
+			void this.plugin.saveSettings();
+		};
+
 		new Setting(containerEl)
 			.setName("Batch size")
 			.setDesc(description)
@@ -119,9 +137,12 @@ export class ChorographiaSettingTab extends PluginSettingTab {
 						if (raw.trim() === "") return;
 						const parsed = Number(raw);
 						if (!Number.isFinite(parsed)) return;
+						const current = getValue();
 						const normalized = clampEmbedBatchSize(parsed, fallback);
-						setValue(normalized);
-						await this.plugin.saveSettings();
+						if (normalized !== current) {
+							setValue(normalized);
+							scheduleSave();
+						}
 						const normalizedStr = String(normalized);
 						if (text.inputEl.value !== normalizedStr) {
 							text.inputEl.value = normalizedStr;
@@ -135,6 +156,7 @@ export class ChorographiaSettingTab extends PluginSettingTab {
 						t.inputEl.style.width = "80px";
 						t.inputEl.addEventListener("blur", () => {
 							t.inputEl.value = String(getValue());
+							flushSave();
 						});
 					})
 			);
