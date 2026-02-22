@@ -119,10 +119,9 @@ export class ChorographiaSettingTab extends PluginSettingTab {
 			}, 200);
 		};
 		const flushSave = () => {
-			if (saveTimer != null) {
-				window.clearTimeout(saveTimer);
-				saveTimer = null;
-			}
+			if (saveTimer == null) return;
+			window.clearTimeout(saveTimer);
+			saveTimer = null;
 			void this.plugin.saveSettings();
 		};
 
