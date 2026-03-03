@@ -7968,7 +7968,7 @@ __export(main_exports, {
   default: () => ChorographiaPlugin
 });
 module.exports = __toCommonJS(main_exports);
-var import_obsidian8 = require("obsidian");
+var import_obsidian9 = require("obsidian");
 
 // src/settings.ts
 var import_obsidian2 = require("obsidian");
@@ -8015,6 +8015,13 @@ var DEFAULT_SETTINGS = {
   openaiLlmModel: "gpt-5-mini",
   embeddingModel: "text-embedding-3-large",
   openaiEmbedBatchSize: DEFAULT_EMBED_BATCH_SIZE,
+  azureLlmEndpoint: "https://<your-azure-openai>.openai.azure.com/openai/responses?api-version=2025-04-01-preview",
+  azureLlmApiKey: "",
+  azureLlmModel: "gpt-5-mini",
+  azureEmbeddingEndpoint: "https://<your-azure-openai>.openai.azure.com/openai/deployments/text-embedding-3-large/embeddings?api-version=2023-05-15",
+  azureEmbeddingApiKey: "",
+  azureEmbeddingEmbedBatchSize: DEFAULT_EMBED_BATCH_SIZE,
+  azureEmbeddingModel: "text-embedding-3-large",
   openrouterApiKey: "",
   openrouterEmbedModel: "openai/text-embedding-3-small",
   openrouterEmbedBatchSize: DEFAULT_EMBED_BATCH_SIZE,
@@ -8154,7 +8161,7 @@ var ChorographiaSettingTab = class extends import_obsidian2.PluginSettingTab {
     {
       const sec = this.createSection(containerEl, "Embedding model", "Choose how note content is converted into vectors for the map layout.");
       new import_obsidian2.Setting(sec).setName("Provider").addDropdown(
-        (dd) => dd.addOption("ollama", "Ollama (local)").addOption("openai", "OpenAI").addOption("openrouter", "OpenRouter").setValue(this.plugin.settings.embeddingProvider).onChange(async (value) => {
+        (dd) => dd.addOption("ollama", "Ollama (local)").addOption("openai", "OpenAI").addOption("openrouter", "OpenRouter").addOption("azure-openai", "Azure OpenAI").setValue(this.plugin.settings.embeddingProvider).onChange(async (value) => {
           this.plugin.settings.embeddingProvider = value;
           await this.plugin.saveSettings();
           this.display();
@@ -8206,6 +8213,34 @@ var ChorographiaSettingTab = class extends import_obsidian2.PluginSettingTab {
           DEFAULT_SETTINGS.openrouterEmbedBatchSize,
           (next) => {
             this.plugin.settings.openrouterEmbedBatchSize = next;
+          }
+        );
+      } else if (this.plugin.settings.embeddingProvider === "azure-openai") {
+        new import_obsidian2.Setting(sec).setName("Embedding endpoint").setDesc("Azure OpenAI Endpoint for your Embedding.").addText(
+          (text) => text.setValue(this.plugin.settings.azureEmbeddingEndpoint).onChange(async (value) => {
+            this.plugin.settings.azureEmbeddingEndpoint = value;
+            await this.plugin.saveSettings();
+          })
+        );
+        new import_obsidian2.Setting(sec).setName("Embedding model").setDesc("Azure OpenAI model name (e.g. text-embedding-3-large).").addText(
+          (text) => text.setValue(this.plugin.settings.azureEmbeddingModel).onChange(async (value) => {
+            this.plugin.settings.azureEmbeddingModel = value;
+            await this.plugin.saveSettings();
+          })
+        );
+        new import_obsidian2.Setting(sec).setName("Embedding API key").setDesc("Azure OpenAI API Key for the Embedding Endpoint").addText(
+          (text) => text.setValue(this.plugin.settings.azureEmbeddingApiKey).onChange(async (value) => {
+            this.plugin.settings.azureEmbeddingApiKey = value;
+            await this.plugin.saveSettings();
+          })
+        );
+        this.addEmbedBatchSizeSetting(
+          sec,
+          "Notes per OpenAI embedding request (1\u2013100).",
+          () => this.plugin.settings.azureEmbeddingEmbedBatchSize,
+          DEFAULT_SETTINGS.azureEmbeddingEmbedBatchSize,
+          (next) => {
+            this.plugin.settings.azureEmbeddingEmbedBatchSize = next;
           }
         );
       }
@@ -8362,7 +8397,7 @@ var ChorographiaSettingTab = class extends import_obsidian2.PluginSettingTab {
         );
         if (this.plugin.settings.enableLLMZoneNaming) {
           new import_obsidian2.Setting(sec).setName("Zone naming provider").addDropdown(
-            (dd) => dd.addOption("ollama", "Ollama (local)").addOption("openai", "OpenAI").addOption("openrouter", "OpenRouter").setValue(this.plugin.settings.llmProvider).onChange(async (value) => {
+            (dd) => dd.addOption("ollama", "Ollama (local)").addOption("openai", "OpenAI").addOption("openrouter", "OpenRouter").addOption("azure-openai", "Azure OpenAI").setValue(this.plugin.settings.llmProvider).onChange(async (value) => {
               this.plugin.settings.llmProvider = value;
               await this.plugin.saveSettings();
               this.display();
@@ -8386,6 +8421,25 @@ var ChorographiaSettingTab = class extends import_obsidian2.PluginSettingTab {
             new import_obsidian2.Setting(sec).setName("LLM model").setDesc("OpenRouter model ID (e.g. google/gemini-2.0-flash-001).").addText(
               (text) => text.setValue(this.plugin.settings.openrouterLlmModel).onChange(async (value) => {
                 this.plugin.settings.openrouterLlmModel = value;
+                await this.plugin.saveSettings();
+              })
+            );
+          } else if (this.plugin.settings.llmProvider === "azure-openai") {
+            new import_obsidian2.Setting(sec).setName("LLM endpoint").setDesc("Azure OpenAI Endpoint for your LLM.").addText(
+              (text) => text.setValue(this.plugin.settings.azureLlmEndpoint).onChange(async (value) => {
+                this.plugin.settings.azureLlmEndpoint = value;
+                await this.plugin.saveSettings();
+              })
+            );
+            new import_obsidian2.Setting(sec).setName("Azure OpenAI model").setDesc("Azure OpenAI model name (e.g. gpt-5-mini).").addText(
+              (text) => text.setValue(this.plugin.settings.azureLlmModel).onChange(async (value) => {
+                this.plugin.settings.azureLlmModel = value;
+                await this.plugin.saveSettings();
+              })
+            );
+            new import_obsidian2.Setting(sec).setName("Embedding API key").setDesc("Azure OpenAI API Key for the response Endpoint").addText(
+              (text) => text.setValue(this.plugin.settings.azureLlmApiKey).onChange(async (value) => {
+                this.plugin.settings.azureLlmApiKey = value;
                 await this.plugin.saveSettings();
               })
             );
@@ -8893,11 +8947,11 @@ async function embedTextsOllama(texts, baseUrl, model, onProgress, batchSize = 5
   }
   return results;
 }
-async function generateZoneNamesOllama(clusters, baseUrl, model) {
+async function generateZoneNamesOllama(clusters2, baseUrl, model) {
   const result = /* @__PURE__ */ new Map();
-  if (clusters.length === 0)
+  if (clusters2.length === 0)
     return result;
-  const clusterDescs = clusters.map((c) => {
+  const clusterDescs = clusters2.map((c) => {
     const sample = c.titles.slice(0, 15).join(", ");
     return `Cluster ${c.idx}: ${sample}`;
   }).join("\n");
@@ -8945,9 +8999,156 @@ ${clusterDescs}`
   return result;
 }
 
-// src/openrouter.ts
+// src/azure-openai.ts
 var import_obsidian5 = require("obsidian");
 var DELAY_MS2 = 200;
+async function embedTextsAzureOpenAI(texts, endpoint, model, apiKey, onProgress, batchSize = 50) {
+  if (!apiKey)
+    throw new Error("OpenAI API key not set.");
+  const step = Math.max(1, Math.floor(batchSize));
+  const results = [];
+  const skipped = [];
+  for (let i = 0; i < texts.length; i += step) {
+    const batch = texts.slice(i, i + step);
+    try {
+      const batchResults = await embedBatchAzureOpenAI(batch, endpoint, model, apiKey);
+      results.push(...batchResults);
+    } catch (e) {
+      const status = e instanceof Error ? e.status : void 0;
+      if (status === 400 && batch.length > 1) {
+        for (const item of batch) {
+          try {
+            const single = await embedBatchAzureOpenAI([item], endpoint, model, apiKey);
+            results.push(...single);
+          } catch (e2) {
+            const msg = e2 instanceof Error ? e2.message : String(e2);
+            console.warn(`Chorographia: Skipping "${item.path}": ${msg}`);
+            skipped.push(item.path);
+          }
+        }
+      } else {
+        throw e;
+      }
+    }
+    onProgress?.(Math.min(i + step, texts.length), texts.length);
+    if (i + step < texts.length) {
+      await sleep(DELAY_MS2);
+    }
+  }
+  if (skipped.length > 0) {
+    console.warn(`Chorographia: Skipped ${skipped.length} notes due to API errors:`, skipped);
+  }
+  return results;
+}
+async function embedBatchAzureOpenAI(batch, endpoint, model, apiKey) {
+  const resp = await fetchWithExponentialBackoff({
+    url: endpoint,
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      model,
+      input: batch.map((b) => b.text)
+    })
+  });
+  if (resp.status !== 200) {
+    const msg = resp.json?.error?.message || `HTTP ${resp.status}`;
+    const err = Object.assign(new Error(`Azure OpenAI API error: ${msg}`), { status: resp.status });
+    throw err;
+  }
+  const results = [];
+  const data = resp.json.data;
+  for (const d of data) {
+    const arr = new Float32Array(d.embedding);
+    results.push({
+      path: batch[d.index].path,
+      embedding: encodeFloat32(arr)
+    });
+  }
+  return results;
+}
+async function fetchWithExponentialBackoff(requestOptions, maxRetries = 5) {
+  const baseDelay = 2e3;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const resp = await (0, import_obsidian5.requestUrl)(requestOptions);
+      if (resp.status === 429) {
+        if (attempt === maxRetries) {
+          new import_obsidian5.Notice("Chorographia: Azure OpenAI Rate limited and max retries reached.");
+          throw new Error("Chorographia: Azure OpenAI Rate limited and max retries reached.");
+        }
+        const retryAfter = resp.headers["retry-after"] || resp.headers["Retry-After"];
+        let waitTime = retryAfter ? parseInt(retryAfter) * 1e3 : baseDelay * Math.pow(2, attempt);
+        new import_obsidian5.Notice(`Chorographia: Azure Throttle hit. Retrying in ${Math.round(waitTime / 1e3)}s... (Attempt ${attempt + 1} of ${maxRetries})`);
+        await sleep(waitTime);
+        continue;
+      }
+      return resp;
+    } catch (error) {
+      if (attempt === maxRetries)
+        throw error;
+      const waitTime = baseDelay * Math.pow(2, attempt);
+      await sleep(waitTime);
+    }
+  }
+  throw new Error("Chorographia: Azure OpenAI Rate limited and max retries reached.");
+}
+async function generateZoneNamesAzureOpenAI(clusters2, endpoint, model, apiKey) {
+  const result = /* @__PURE__ */ new Map();
+  if (!apiKey || clusters2.length === 0)
+    return result;
+  const clusterDescs = clusters2.map((c) => {
+    const sample = c.titles.slice(0, 15).join(", ");
+    return `Cluster ${c.idx}: ${sample}`;
+  }).join("\n");
+  try {
+    const resp = await fetchWithExponentialBackoff({
+      url: endpoint,
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          {
+            role: "system",
+            content: "You are naming regions on a knowledge map. For each cluster of note titles, produce a short evocative name (2-4 words) that captures the thematic essence. Respond with one name per line in the format: CLUSTER_NUM: Name"
+          },
+          {
+            role: "user",
+            content: `Name each knowledge region:
+
+${clusterDescs}`
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 300
+      })
+    });
+    if (resp.status !== 200)
+      return result;
+    const text = resp.json?.choices?.[0]?.message?.content || "";
+    for (const line of text.split("\n")) {
+      const match = line.match(/(\d+)\s*:\s*(.+)/);
+      if (match) {
+        const idx = parseInt(match[1], 10);
+        const name = match[2].trim();
+        if (name)
+          result.set(idx, name);
+      }
+    }
+  } catch {
+  }
+  return result;
+}
+
+// src/openrouter.ts
+var import_obsidian6 = require("obsidian");
+var DELAY_MS3 = 200;
 async function embedTextsOpenRouter(texts, apiKey, model, onProgress, batchSize = 50) {
   if (!apiKey)
     throw new Error("OpenRouter API key not set.");
@@ -8978,7 +9179,7 @@ async function embedTextsOpenRouter(texts, apiKey, model, onProgress, batchSize 
     }
     onProgress?.(Math.min(i + step, texts.length), texts.length);
     if (i + step < texts.length) {
-      await (0, import_obsidian5.sleep)(DELAY_MS2);
+      await (0, import_obsidian6.sleep)(DELAY_MS3);
     }
   }
   if (skipped.length > 0) {
@@ -8987,7 +9188,7 @@ async function embedTextsOpenRouter(texts, apiKey, model, onProgress, batchSize 
   return results;
 }
 async function embedBatch2(batch, apiKey, model) {
-  const resp = await (0, import_obsidian5.requestUrl)({
+  const resp = await (0, import_obsidian6.requestUrl)({
     url: "https://openrouter.ai/api/v1/embeddings",
     method: "POST",
     headers: {
@@ -9015,16 +9216,16 @@ async function embedBatch2(batch, apiKey, model) {
   }
   return results;
 }
-async function generateZoneNamesOpenRouter(clusters, apiKey, model) {
+async function generateZoneNamesOpenRouter(clusters2, apiKey, model) {
   const result = /* @__PURE__ */ new Map();
-  if (!apiKey || clusters.length === 0)
+  if (!apiKey || clusters2.length === 0)
     return result;
-  const clusterDescs = clusters.map((c) => {
+  const clusterDescs = clusters2.map((c) => {
     const sample = c.titles.slice(0, 15).join(", ");
     return `Cluster ${c.idx}: ${sample}`;
   }).join("\n");
   try {
-    const resp = await (0, import_obsidian5.requestUrl)({
+    const resp = await (0, import_obsidian6.requestUrl)({
       url: "https://openrouter.ai/api/v1/chat/completions",
       method: "POST",
       headers: {
@@ -9282,7 +9483,7 @@ function computeSemanticAssignments(vectors, centroids) {
 }
 
 // src/view.ts
-var import_obsidian7 = require("obsidian");
+var import_obsidian8 = require("obsidian");
 
 // src/voronoi.ts
 function mulberry323(seed) {
@@ -10821,17 +11022,17 @@ function drawZone(ctx, zone, w2s, alpha, dashed = false, worldmap = false, skipL
 }
 
 // src/zoneNaming.ts
-var import_obsidian6 = require("obsidian");
-async function generateZoneNames(clusters, apiKey, model = "gpt-5-mini") {
+var import_obsidian7 = require("obsidian");
+async function generateZoneNames(clusters2, apiKey, model = "gpt-5-mini") {
   const result = /* @__PURE__ */ new Map();
-  if (!apiKey || clusters.length === 0)
+  if (!apiKey || clusters2.length === 0)
     return result;
-  const clusterDescs = clusters.map((c) => {
+  const clusterDescs = clusters2.map((c) => {
     const sample = c.titles.slice(0, 15).join(", ");
     return `Cluster ${c.idx}: ${sample}`;
   }).join("\n");
   try {
-    const resp = await (0, import_obsidian6.requestUrl)({
+    const resp = await (0, import_obsidian7.requestUrl)({
       url: "https://api.openai.com/v1/chat/completions",
       method: "POST",
       headers: {
@@ -11406,7 +11607,7 @@ function themeOutlineColor() {
   const isDark = document.body.classList.contains("theme-dark");
   return isDark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.7)";
 }
-var ChorographiaView = class extends import_obsidian7.ItemView {
+var ChorographiaView = class extends import_obsidian8.ItemView {
   constructor(leaf, plugin) {
     super(leaf);
     this.dpr = 1;
@@ -11521,11 +11722,11 @@ var ChorographiaView = class extends import_obsidian7.ItemView {
   buildControls(root) {
     const iconBar = root.createEl("div", { cls: "chorographia-icon-bar" });
     const settingsBtn = iconBar.createEl("button", { cls: "chorographia-icon-btn", attr: { "aria-label": "Settings" } });
-    (0, import_obsidian7.setIcon)(settingsBtn, "settings");
+    (0, import_obsidian8.setIcon)(settingsBtn, "settings");
     const snapshotBtn = iconBar.createEl("button", { cls: "chorographia-icon-btn", attr: { "aria-label": "Snapshots" } });
-    (0, import_obsidian7.setIcon)(snapshotBtn, "camera");
+    (0, import_obsidian8.setIcon)(snapshotBtn, "camera");
     const exportBtn = iconBar.createEl("button", { cls: "chorographia-icon-btn", attr: { "aria-label": "Export" } });
-    (0, import_obsidian7.setIcon)(exportBtn, "download");
+    (0, import_obsidian8.setIcon)(exportBtn, "download");
     this.settingsPanel = root.createEl("div", { cls: "chorographia-menu" });
     this.snapshotPanel = root.createEl("div", { cls: "chorographia-menu chorographia-snapshot-panel" });
     this.exportPanel = root.createEl("div", { cls: "chorographia-menu chorographia-export-panel" });
@@ -11669,17 +11870,17 @@ var ChorographiaView = class extends import_obsidian7.ItemView {
     saveBtn.addEventListener("click", async () => {
       const name = saveInput.value.trim();
       if (!name) {
-        new import_obsidian7.Notice("Enter a name for the snapshot.");
+        new import_obsidian8.Notice("Enter a name for the snapshot.");
         return;
       }
       saveBtn.disabled = true;
       try {
         await this.plugin.saveSnapshot(name);
-        new import_obsidian7.Notice(`Snapshot "${name}" saved.`);
+        new import_obsidian8.Notice(`Snapshot "${name}" saved.`);
         saveInput.value = "";
         this.refreshSnapshotList();
       } catch (e) {
-        new import_obsidian7.Notice("Save failed: " + (e instanceof Error ? e.message : String(e)));
+        new import_obsidian8.Notice("Save failed: " + (e instanceof Error ? e.message : String(e)));
       }
       saveBtn.disabled = false;
     });
@@ -11720,15 +11921,15 @@ var ChorographiaView = class extends import_obsidian7.ItemView {
           return;
         }
         await this.plugin.deleteSnapshot(s.path);
-        new import_obsidian7.Notice("Snapshot deleted.");
+        new import_obsidian8.Notice("Snapshot deleted.");
         this.refreshSnapshotList();
       });
       row.addEventListener("click", async () => {
         try {
           await this.plugin.loadSnapshot(s.path);
-          new import_obsidian7.Notice(`Snapshot "${s.name}" loaded.`);
+          new import_obsidian8.Notice(`Snapshot "${s.name}" loaded.`);
         } catch (e) {
-          new import_obsidian7.Notice("Load failed: " + (e instanceof Error ? e.message : String(e)));
+          new import_obsidian8.Notice("Load failed: " + (e instanceof Error ? e.message : String(e)));
         }
       });
     }
@@ -11840,7 +12041,7 @@ var ChorographiaView = class extends import_obsidian7.ItemView {
       this.exportWholeMap();
     } else if (this.exportMode === "region") {
       if (!this.regionWorld) {
-        new import_obsidian7.Notice("Draw a rectangle on the map first.");
+        new import_obsidian8.Notice("Draw a rectangle on the map first.");
         return;
       }
       this.exportRegion();
@@ -11849,7 +12050,7 @@ var ChorographiaView = class extends import_obsidian7.ItemView {
   exportCurrentView() {
     this.canvas.toBlob((blob) => {
       if (!blob) {
-        new import_obsidian7.Notice("Export failed.");
+        new import_obsidian8.Notice("Export failed.");
         return;
       }
       this.downloadBlob(blob, "chorographia-view");
@@ -11857,7 +12058,7 @@ var ChorographiaView = class extends import_obsidian7.ItemView {
   }
   exportWholeMap() {
     if (this.allPoints.length === 0) {
-      new import_obsidian7.Notice("No points to export.");
+      new import_obsidian8.Notice("No points to export.");
       return;
     }
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
@@ -11966,12 +12167,12 @@ var ChorographiaView = class extends import_obsidian7.ItemView {
     this.plugin.settings.minimapCorner = origMinimap;
     offCanvas.toBlob((blob) => {
       if (!blob) {
-        new import_obsidian7.Notice("Export failed.");
+        new import_obsidian8.Notice("Export failed.");
         return;
       }
       const suffix = this.exportMode === "region" ? "region" : "full";
       this.downloadBlob(blob, `chorographia-${suffix}`);
-      new import_obsidian7.Notice("Map exported.");
+      new import_obsidian8.Notice("Map exported.");
     }, "image/png");
   }
   downloadBlob(blob, prefix) {
@@ -11984,7 +12185,7 @@ var ChorographiaView = class extends import_obsidian7.ItemView {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    new import_obsidian7.Notice("Map exported.");
+    new import_obsidian8.Notice("Map exported.");
   }
   buildFilterUI() {
     this.filterPanel.empty();
@@ -12372,7 +12573,7 @@ var ChorographiaView = class extends import_obsidian7.ItemView {
     const skipLLMNaming = locked && this.plugin.cache.lockedLabels && Object.keys(this.plugin.cache.lockedLabels).length > 0;
     if (this.plugin.settings.enableLLMZoneNaming && !skipLLMNaming) {
       try {
-        const clusters = this.zones.map((z) => ({
+        const clusters2 = this.zones.map((z) => ({
           idx: z.id,
           titles: z.memberPaths.map((p) => {
             const note = this.plugin.cache.notes[p];
@@ -12381,11 +12582,13 @@ var ChorographiaView = class extends import_obsidian7.ItemView {
         }));
         let llmNames = /* @__PURE__ */ new Map();
         if (this.plugin.settings.llmProvider === "ollama") {
-          llmNames = await generateZoneNamesOllama(clusters, this.plugin.settings.ollamaUrl, this.plugin.settings.ollamaLlmModel);
+          llmNames = await generateZoneNamesOllama(clusters2, this.plugin.settings.ollamaUrl, this.plugin.settings.ollamaLlmModel);
         } else if (this.plugin.settings.llmProvider === "openai" && this.plugin.settings.openaiApiKey) {
-          llmNames = await generateZoneNames(clusters, this.plugin.settings.openaiApiKey, this.plugin.settings.openaiLlmModel);
+          llmNames = await generateZoneNames(clusters2, this.plugin.settings.openaiApiKey, this.plugin.settings.openaiLlmModel);
         } else if (this.plugin.settings.llmProvider === "openrouter" && this.plugin.settings.openrouterApiKey) {
-          llmNames = await generateZoneNamesOpenRouter(clusters, this.plugin.settings.openrouterApiKey, this.plugin.settings.openrouterLlmModel);
+          llmNames = await generateZoneNamesOpenRouter(clusters2, this.plugin.settings.openrouterApiKey, this.plugin.settings.openrouterLlmModel);
+        } else if (this.plugin.settings.llmProvider === "azure-openai" && this.plugin.settings.azureLlmApiKey) {
+          llmNames = await generateZoneNamesAzureOpenAI(clusters2, this.plugin.settings.azureLlmEndpoint, this.plugin.settings.azureLlmModel, this.plugin.settings.azureLlmApiKey);
         }
         for (const [idx, name] of llmNames) {
           labelMap[idx] = name;
@@ -12443,6 +12646,8 @@ var ChorographiaView = class extends import_obsidian7.ItemView {
           llmNames = await generateZoneNames(batchClusters, this.plugin.settings.openaiApiKey, this.plugin.settings.openaiLlmModel);
         } else if (this.plugin.settings.llmProvider === "openrouter" && this.plugin.settings.openrouterApiKey) {
           llmNames = await generateZoneNamesOpenRouter(batchClusters, this.plugin.settings.openrouterApiKey, this.plugin.settings.openrouterLlmModel);
+        } else if (this.plugin.settings.llmProvider === "azure-openai" && this.plugin.settings.azureLlmApiKey) {
+          llmNames = await generateZoneNamesAzureOpenAI(clusters, this.plugin.settings.azureLlmEndpoint, this.plugin.settings.azureLlmModel, this.plugin.settings.azureLlmApiKey);
         }
         for (const [batchIdx, name] of llmNames) {
           const c = allSubClusters[batchIdx];
@@ -14215,14 +14420,14 @@ function noteColor(note, folderColors, propertyColorMap, colorMode, colorPropert
   }
   return folderColors.get(note.folder) || pal.folder[0];
 }
-var ChorographiaPlugin = class extends import_obsidian8.Plugin {
+var ChorographiaPlugin = class extends import_obsidian9.Plugin {
   constructor() {
     super(...arguments);
     this.settings = DEFAULT_SETTINGS;
     this.cache = { notes: {} };
     this.dotColorMap = /* @__PURE__ */ new Map();
     this.explorerObserver = null;
-    this.applyDotsDebounced = (0, import_obsidian8.debounce)(() => this.applyDotsToVisibleNodes(), 50, true);
+    this.applyDotsDebounced = (0, import_obsidian9.debounce)(() => this.applyDotsToVisibleNodes(), 50, true);
   }
   getActiveTheme() {
     return getThemeById(this.settings.activeTheme);
@@ -14294,10 +14499,15 @@ var ChorographiaPlugin = class extends import_obsidian8.Plugin {
       this.settings.openrouterEmbedBatchSize,
       DEFAULT_SETTINGS.openrouterEmbedBatchSize
     );
-    const needsSettingsSave = normalizedOllamaBatchSize !== this.settings.ollamaEmbedBatchSize || normalizedOpenAIBatchSize !== this.settings.openaiEmbedBatchSize || normalizedOpenRouterBatchSize !== this.settings.openrouterEmbedBatchSize;
+    const normalizedAzureOpenAIBatchSize = clampEmbedBatchSize(
+      this.settings.azureEmbeddingEmbedBatchSize,
+      DEFAULT_SETTINGS.azureEmbeddingEmbedBatchSize
+    );
+    const needsSettingsSave = normalizedOllamaBatchSize !== this.settings.ollamaEmbedBatchSize || normalizedOpenAIBatchSize !== this.settings.openaiEmbedBatchSize || normalizedOpenRouterBatchSize !== this.settings.openrouterEmbedBatchSize || normalizedAzureOpenAIBatchSize !== this.settings.azureEmbeddingEmbedBatchSize;
     this.settings.ollamaEmbedBatchSize = normalizedOllamaBatchSize;
     this.settings.openaiEmbedBatchSize = normalizedOpenAIBatchSize;
     this.settings.openrouterEmbedBatchSize = normalizedOpenRouterBatchSize;
+    this.settings.azureEmbeddingEmbedBatchSize = normalizedAzureOpenAIBatchSize;
     if (needsSettingsSave) {
       await this.saveSettings();
     }
@@ -14328,6 +14538,8 @@ var ChorographiaPlugin = class extends import_obsidian8.Plugin {
         return `openai:${this.settings.embeddingModel}`;
       case "openrouter":
         return `openrouter:${this.settings.openrouterEmbedModel}`;
+      case "azure-openai":
+        return `azure-openai:${this.settings.azureEmbeddingModel}`;
     }
   }
   async runEmbedPipeline() {
@@ -14336,11 +14548,15 @@ var ChorographiaPlugin = class extends import_obsidian8.Plugin {
     const modelName = provider === "ollama" ? this.settings.ollamaEmbedModel : provider === "openai" ? this.settings.embeddingModel : this.settings.openrouterEmbedModel;
     console.debug(`[Chorographia] Pipeline started | provider: ${provider} | model: ${modelName}`);
     if (provider === "openai" && !this.settings.openaiApiKey) {
-      new import_obsidian8.Notice("Chorographia: Set your OpenAI API key in settings first.");
+      new import_obsidian9.Notice("Chorographia: Set your OpenAI API key in settings first.");
       return;
     }
     if (provider === "openrouter" && !this.settings.openrouterApiKey) {
-      new import_obsidian8.Notice("Chorographia: Set your OpenRouter API key in settings first.");
+      new import_obsidian9.Notice("Chorographia: Set your OpenRouter API key in settings first.");
+      return;
+    }
+    if (provider === "azure-openai" && !this.settings.azureEmbeddingApiKey && !this.settings.azureEmbeddingEndpoint) {
+      new import_obsidian9.Notice("Chorographia: Set your Azure OpenAI API key & endpoint in settings first.");
       return;
     }
     const splitTrim = (s) => s.split(",").map((x) => x.trim()).filter(Boolean);
@@ -14356,9 +14572,9 @@ var ChorographiaPlugin = class extends import_obsidian8.Plugin {
       filterExcludeFolders: splitTrim(this.settings.filterExcludeFolders),
       filterRequireProperty: this.settings.filterRequireProperty
     };
-    new import_obsidian8.Notice("Chorographia: Indexing vault...");
+    new import_obsidian9.Notice("Chorographia: Indexing vault...");
     const notes = await indexVault(this.app, indexerConfig);
-    new import_obsidian8.Notice(`Chorographia: Found ${notes.length} notes.`);
+    new import_obsidian9.Notice(`Chorographia: Found ${notes.length} notes.`);
     const modelStr = this.embeddingModelString;
     const toEmbed = [];
     for (const note of notes) {
@@ -14382,16 +14598,16 @@ var ChorographiaPlugin = class extends import_obsidian8.Plugin {
       }
     }
     if (toEmbed.length === 0) {
-      new import_obsidian8.Notice("Chorographia: All notes up to date.");
+      new import_obsidian9.Notice("Chorographia: All notes up to date.");
       await this.saveCache();
       this.refreshMapViews();
       this.updateExplorerDots();
       return;
     }
-    new import_obsidian8.Notice(
+    new import_obsidian9.Notice(
       `Chorographia: Embedding ${toEmbed.length} notes...`
     );
-    const batchSize = provider === "ollama" ? clampEmbedBatchSize(this.settings.ollamaEmbedBatchSize, DEFAULT_SETTINGS.ollamaEmbedBatchSize) : provider === "openai" ? clampEmbedBatchSize(this.settings.openaiEmbedBatchSize, DEFAULT_SETTINGS.openaiEmbedBatchSize) : clampEmbedBatchSize(this.settings.openrouterEmbedBatchSize, DEFAULT_SETTINGS.openrouterEmbedBatchSize);
+    const batchSize = provider === "ollama" ? clampEmbedBatchSize(this.settings.ollamaEmbedBatchSize, DEFAULT_SETTINGS.ollamaEmbedBatchSize) : provider === "openai" ? clampEmbedBatchSize(this.settings.openaiEmbedBatchSize, DEFAULT_SETTINGS.openaiEmbedBatchSize) : provider === "azure-openai" ? clampEmbedBatchSize(this.settings.openaiEmbedBatchSize, DEFAULT_SETTINGS.azureEmbeddingEmbedBatchSize) : clampEmbedBatchSize(this.settings.openrouterEmbedBatchSize, DEFAULT_SETTINGS.openrouterEmbedBatchSize);
     const onProgress = (done, total) => {
       const pct = Math.round(done / total * 100);
       const elapsedSec = (performance.now() - pipelineStart) / 1e3;
@@ -14399,7 +14615,7 @@ var ChorographiaPlugin = class extends import_obsidian8.Plugin {
       const rate = done / safeElapsed;
       const rateStr = rate < 0.1 ? rate.toFixed(2) : rate.toFixed(1);
       const eta = done > 0 && rate > 0 ? Math.round((total - done) / rate) : "?";
-      new import_obsidian8.Notice(`Chorographia: Embedded ${done}/${total} (${pct}%)`);
+      new import_obsidian9.Notice(`Chorographia: Embedded ${done}/${total} (${pct}%)`);
     };
     let results = [];
     try {
@@ -14413,13 +14629,23 @@ var ChorographiaPlugin = class extends import_obsidian8.Plugin {
         case "openrouter":
           results = await embedTextsOpenRouter(toEmbed, this.settings.openrouterApiKey, this.settings.openrouterEmbedModel, onProgress, batchSize);
           break;
+        case "azure-openai":
+          results = await embedTextsAzureOpenAI(
+            toEmbed,
+            this.settings.azureEmbeddingEndpoint,
+            this.settings.azureEmbeddingModel,
+            this.settings.azureEmbeddingApiKey,
+            onProgress,
+            batchSize
+          );
+          break;
       }
     } catch (err) {
       const elapsed = ((performance.now() - pipelineStart) / 1e3).toFixed(1);
       const message = err instanceof Error ? err.message : String(err);
       const batchHint = `If this looks like a request-size or rate-limit error, try lowering Embedding > Batch size (currently ${batchSize}).`;
       console.error(`[Chorographia] [${modelName}] Pipeline FAILED after ${elapsed}s:`, err);
-      new import_obsidian8.Notice(`Chorographia: Embedding failed - ${message}. ${batchHint}`);
+      new import_obsidian9.Notice(`Chorographia: Embedding failed - ${message}. ${batchHint}`);
       return;
     }
     for (const r of results) {
@@ -14463,7 +14689,7 @@ var ChorographiaPlugin = class extends import_obsidian8.Plugin {
     await this.saveCache();
     this.refreshMapViews();
     this.updateExplorerDots();
-    new import_obsidian8.Notice(`Chorographia: Embedding complete (${results.length} new).`);
+    new import_obsidian9.Notice(`Chorographia: Embedding complete (${results.length} new).`);
     const hasLayout = Object.values(this.cache.notes).some(
       (n) => n.x != null
     );
@@ -14500,7 +14726,7 @@ var ChorographiaPlugin = class extends import_obsidian8.Plugin {
     if (!await this.app.vault.adapter.exists(dir)) {
       await this.app.vault.adapter.mkdir(dir);
     }
-    const filename = (0, import_obsidian8.normalizePath)(`${dir}/${name.replace(/[^a-zA-Z0-9_-]/g, "_")}.json`);
+    const filename = (0, import_obsidian9.normalizePath)(`${dir}/${name.replace(/[^a-zA-Z0-9_-]/g, "_")}.json`);
     await this.app.vault.adapter.write(filename, JSON.stringify(snapshot));
   }
   async loadSnapshot(filename) {
@@ -14621,15 +14847,15 @@ var ChorographiaPlugin = class extends import_obsidian8.Plugin {
       (n) => n.embedding
     ).length;
     if (count === 0) {
-      new import_obsidian8.Notice("Chorographia: No embeddings cached. Run re-embed first.");
+      new import_obsidian9.Notice("Chorographia: No embeddings cached. Run re-embed first.");
       return;
     }
     if (this.settings.mapLocked) {
       const newPaths = Object.entries(this.cache.notes).filter(([_, n]) => n.embedding && n.x == null).map(([p]) => p);
       if (newPaths.length === 0) {
-        new import_obsidian8.Notice("Chorographia: All notes already placed.");
+        new import_obsidian9.Notice("Chorographia: All notes already placed.");
       } else {
-        new import_obsidian8.Notice(`Chorographia: Placing ${newPaths.length} new notes...`);
+        new import_obsidian9.Notice(`Chorographia: Placing ${newPaths.length} new notes...`);
         const points = interpolateNewPoints(this.cache.notes, newPaths);
         for (const p of points) {
           if (this.cache.notes[p.path]) {
@@ -14641,7 +14867,7 @@ var ChorographiaPlugin = class extends import_obsidian8.Plugin {
       this.computeSemanticColorsLocked();
       this.preserveAndInvalidateZones();
     } else {
-      new import_obsidian8.Notice(`Chorographia: Computing layout for ${count} notes...`);
+      new import_obsidian9.Notice(`Chorographia: Computing layout for ${count} notes...`);
       await new Promise((resolve) => {
         setTimeout(() => {
           const points = computeLayout(this.cache.notes);
@@ -14658,7 +14884,7 @@ var ChorographiaPlugin = class extends import_obsidian8.Plugin {
       await this.computeSemanticColors();
     }
     await this.saveCache();
-    new import_obsidian8.Notice("Chorographia: Layout computed.");
+    new import_obsidian9.Notice("Chorographia: Layout computed.");
     for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE)) {
       leaf.view.refresh();
     }

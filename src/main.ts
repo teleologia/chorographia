@@ -9,6 +9,7 @@ import { PluginCache, NoteCache } from "./cache";
 import { indexVault, IndexerConfig } from "./indexer";
 import { embedTexts } from "./openai";
 import { embedTextsOllama } from "./ollama";
+import { embedTextsAzureOpenAI } from "./azure-openai";
 import { embedTextsOpenRouter } from "./openrouter";
 import { computeLayout, interpolateNewPoints } from "./layout";
 import { kMeans, computeSemanticAssignments } from "./kmeans";
@@ -155,13 +156,19 @@ export default class ChorographiaPlugin extends Plugin {
 			this.settings.openrouterEmbedBatchSize,
 			DEFAULT_SETTINGS.openrouterEmbedBatchSize
 		);
+		const normalizedAzureOpenAIBatchSize = clampEmbedBatchSize(
+			this.settings.azureEmbeddingEmbedBatchSize,
+			DEFAULT_SETTINGS.azureEmbeddingEmbedBatchSize
+		);
 		const needsSettingsSave =
 			normalizedOllamaBatchSize !== this.settings.ollamaEmbedBatchSize ||
 			normalizedOpenAIBatchSize !== this.settings.openaiEmbedBatchSize ||
-			normalizedOpenRouterBatchSize !== this.settings.openrouterEmbedBatchSize;
+			normalizedOpenRouterBatchSize !== this.settings.openrouterEmbedBatchSize ||
+			normalizedAzureOpenAIBatchSize !== this.settings.azureEmbeddingEmbedBatchSize;
 		this.settings.ollamaEmbedBatchSize = normalizedOllamaBatchSize;
 		this.settings.openaiEmbedBatchSize = normalizedOpenAIBatchSize;
 		this.settings.openrouterEmbedBatchSize = normalizedOpenRouterBatchSize;
+		this.settings.azureEmbeddingEmbedBatchSize = normalizedAzureOpenAIBatchSize;
 		if (needsSettingsSave) {
 			await this.saveSettings();
 		}
@@ -195,6 +202,7 @@ export default class ChorographiaPlugin extends Plugin {
 			case "ollama": return `ollama:${this.settings.ollamaEmbedModel}`;
 			case "openai": return `openai:${this.settings.embeddingModel}`;
 			case "openrouter": return `openrouter:${this.settings.openrouterEmbedModel}`;
+			case "azure-openai": return `azure-openai:${this.settings.azureEmbeddingModel}`;
 		}
 	}
 
@@ -215,6 +223,10 @@ export default class ChorographiaPlugin extends Plugin {
 		}
 		if (provider === "openrouter" && !this.settings.openrouterApiKey) {
 			new Notice("Chorographia: Set your OpenRouter API key in settings first.");
+			return;
+		}
+				if (provider === "azure-openai" && !this.settings.azureEmbeddingApiKey && !this.settings.azureEmbeddingEndpoint) {
+			new Notice("Chorographia: Set your Azure OpenAI API key & endpoint in settings first.");
 			return;
 		}
 
@@ -283,7 +295,9 @@ export default class ChorographiaPlugin extends Plugin {
 			? clampEmbedBatchSize(this.settings.ollamaEmbedBatchSize, DEFAULT_SETTINGS.ollamaEmbedBatchSize)
 			: provider === "openai"
 				? clampEmbedBatchSize(this.settings.openaiEmbedBatchSize, DEFAULT_SETTINGS.openaiEmbedBatchSize)
-				: clampEmbedBatchSize(this.settings.openrouterEmbedBatchSize, DEFAULT_SETTINGS.openrouterEmbedBatchSize);
+				: provider === "azure-openai"
+					? clampEmbedBatchSize(this.settings.openaiEmbedBatchSize, DEFAULT_SETTINGS.azureEmbeddingEmbedBatchSize)
+					: clampEmbedBatchSize(this.settings.openrouterEmbedBatchSize, DEFAULT_SETTINGS.openrouterEmbedBatchSize);
 
 		const onProgress = (done: number, total: number) => {
 			const pct = Math.round((done / total) * 100);
@@ -306,6 +320,10 @@ export default class ChorographiaPlugin extends Plugin {
 					break;
 				case "openrouter":
 					results = await embedTextsOpenRouter(toEmbed, this.settings.openrouterApiKey, this.settings.openrouterEmbedModel, onProgress, batchSize);
+					break;
+				case "azure-openai":
+					results = await embedTextsAzureOpenAI(toEmbed, this.settings.azureEmbeddingEndpoint, this.settings.azureEmbeddingModel,
+						 this.settings.azureEmbeddingApiKey, onProgress, batchSize);
 					break;
 			}
 		} catch (err) {
