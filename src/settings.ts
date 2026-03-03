@@ -50,12 +50,19 @@ export function clampEmbedBatchSize(value: number, fallback = DEFAULT_EMBED_BATC
 }
 
 export interface ChorographiaSettings {
-	embeddingProvider: "ollama" | "openai" | "openrouter";
+	embeddingProvider: "ollama" | "openai" | "openrouter" | "azure-openai";
 	ollamaUrl: string;
 	ollamaEmbedModel: string;
 	ollamaEmbedBatchSize: number;
 	ollamaLlmModel: string;
-	llmProvider: "ollama" | "openai" | "openrouter";
+	llmProvider: "ollama" | "openai" | "openrouter" | "azure-openai";
+	azureLlmEndpoint: string;
+	azureLlmApiKey: string;
+	azureLlmModel: string;
+	azureEmbeddingEndpoint: string;
+	azureEmbeddingApiKey: string;
+	azureEmbeddingEmbedBatchSize: number;
+	azureEmbeddingModel: string;
 	openaiApiKey: string;
 	openaiLlmModel: string;
 	embeddingModel: string;
@@ -112,6 +119,13 @@ export const DEFAULT_SETTINGS: ChorographiaSettings = {
 	openaiLlmModel: "gpt-5-mini",
 	embeddingModel: "text-embedding-3-large",
 	openaiEmbedBatchSize: DEFAULT_EMBED_BATCH_SIZE,
+	azureLlmEndpoint: "https://<your-azure-openai>.openai.azure.com/openai/responses?api-version=2025-04-01-preview",
+	azureLlmApiKey: "",
+	azureLlmModel: "gpt-5-mini",
+	azureEmbeddingEndpoint: "https://<your-azure-openai>.openai.azure.com/openai/deployments/text-embedding-3-large/embeddings?api-version=2023-05-15",
+	azureEmbeddingApiKey: "",
+	azureEmbeddingEmbedBatchSize: DEFAULT_EMBED_BATCH_SIZE,
+	azureEmbeddingModel: "text-embedding-3-large",
 	openrouterApiKey: "",
 	openrouterEmbedModel: "openai/text-embedding-3-small",
 	openrouterEmbedBatchSize: DEFAULT_EMBED_BATCH_SIZE,
@@ -299,6 +313,7 @@ export class ChorographiaSettingTab extends PluginSettingTab {
 						.addOption("ollama", "Ollama (local)")
 						.addOption("openai", "OpenAI")
 						.addOption("openrouter", "OpenRouter")
+						.addOption("azure-openai", "Azure OpenAI")
 						.setValue(this.plugin.settings.embeddingProvider)
 						.onChange(async (value) => {
 							this.plugin.settings.embeddingProvider = value as ChorographiaSettings["embeddingProvider"];
@@ -363,6 +378,49 @@ export class ChorographiaSettingTab extends PluginSettingTab {
 					() => this.plugin.settings.openrouterEmbedBatchSize,
 					DEFAULT_SETTINGS.openrouterEmbedBatchSize,
 					(next) => { this.plugin.settings.openrouterEmbedBatchSize = next; }
+				);
+			} else if (this.plugin.settings.embeddingProvider === "azure-openai") {
+				new Setting(sec)
+					.setName("Embedding endpoint")
+					.setDesc("Azure OpenAI Endpoint for your Embedding.")
+					.addText((text) =>
+						text
+							.setValue(this.plugin.settings.azureEmbeddingEndpoint)
+							.onChange(async (value) => {
+								this.plugin.settings.azureEmbeddingEndpoint = value;
+								await this.plugin.saveSettings();
+							})
+					);
+				
+				new Setting(sec)
+					.setName("Embedding model")
+					.setDesc("Azure OpenAI model name (e.g. text-embedding-3-large).")
+					.addText((text) =>
+						text
+							.setValue(this.plugin.settings.azureEmbeddingModel)
+							.onChange(async (value) => {
+								this.plugin.settings.azureEmbeddingModel = value;
+								await this.plugin.saveSettings();
+							})
+					);
+				new Setting(sec)
+					.setName("Embedding API key")
+					.setDesc("Azure OpenAI API Key for the Embedding Endpoint")
+					.addText((text) =>
+						text
+							.setValue(this.plugin.settings.azureEmbeddingApiKey)
+							.onChange(async (value) => {
+								this.plugin.settings.azureEmbeddingApiKey = value;
+								await this.plugin.saveSettings();
+							})
+					);
+				
+				this.addEmbedBatchSizeSetting(
+					sec,
+					"Notes per OpenAI embedding request (1\u2013100).",
+					() => this.plugin.settings.azureEmbeddingEmbedBatchSize,
+					DEFAULT_SETTINGS.azureEmbeddingEmbedBatchSize,
+					(next) => { this.plugin.settings.azureEmbeddingEmbedBatchSize = next; }
 				);
 			}
 		}
@@ -634,6 +692,7 @@ export class ChorographiaSettingTab extends PluginSettingTab {
 								.addOption("ollama", "Ollama (local)")
 								.addOption("openai", "OpenAI")
 								.addOption("openrouter", "OpenRouter")
+								.addOption("azure-openai", "Azure OpenAI")
 								.setValue(this.plugin.settings.llmProvider)
 								.onChange(async (value) => {
 									this.plugin.settings.llmProvider = value as ChorographiaSettings["llmProvider"];
@@ -675,6 +734,41 @@ export class ChorographiaSettingTab extends PluginSettingTab {
 									.setValue(this.plugin.settings.openrouterLlmModel)
 									.onChange(async (value) => {
 										this.plugin.settings.openrouterLlmModel = value;
+										await this.plugin.saveSettings();
+									})
+							);
+					} else if (this.plugin.settings.llmProvider === "azure-openai") {
+						new Setting(sec)
+							.setName("LLM endpoint")
+							.setDesc("Azure OpenAI Endpoint for your LLM.")
+							.addText((text) =>
+								text
+									.setValue(this.plugin.settings.azureLlmEndpoint)
+									.onChange(async (value) => {
+										this.plugin.settings.azureLlmEndpoint = value;
+										await this.plugin.saveSettings();
+									})
+							);
+						
+						new Setting(sec)
+							.setName("Azure OpenAI model")
+							.setDesc("Azure OpenAI model name (e.g. gpt-5-mini).")
+							.addText((text) =>
+								text
+									.setValue(this.plugin.settings.azureLlmModel)
+									.onChange(async (value) => {
+										this.plugin.settings.azureLlmModel = value;
+										await this.plugin.saveSettings();
+									})
+							);
+						new Setting(sec)
+							.setName("Embedding API key")
+							.setDesc("Azure OpenAI API Key for the response Endpoint")
+							.addText((text) =>
+								text
+									.setValue(this.plugin.settings.azureLlmApiKey)
+									.onChange(async (value) => {
+										this.plugin.settings.azureLlmApiKey = value;
 										await this.plugin.saveSettings();
 									})
 							);

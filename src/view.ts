@@ -8,6 +8,7 @@ import { Zone, Continent, BorderEdge, WorldMapResult, WorldMapSettings, computeZ
 import { generateZoneNames } from "./zoneNaming";
 import { generateZoneNamesOllama } from "./ollama";
 import { generateZoneNamesOpenRouter } from "./openrouter";
+import { generateZoneNamesAzureOpenAI } from "./azure-openai";
 import type { ThemeColors, MapTheme } from "./theme";
 import { classifyAll, drawTerrainIcon, type TerrainType } from "./terrain";
 import { strokeWobblyLine, strokeWobblyPolyline, fillStipple, hashCoords, mulberry32 } from "./ink";
@@ -1142,6 +1143,8 @@ export class ChorographiaView extends ItemView {
 					llmNames = await generateZoneNames(clusters, this.plugin.settings.openaiApiKey, this.plugin.settings.openaiLlmModel);
 				} else if (this.plugin.settings.llmProvider === "openrouter" && this.plugin.settings.openrouterApiKey) {
 					llmNames = await generateZoneNamesOpenRouter(clusters, this.plugin.settings.openrouterApiKey, this.plugin.settings.openrouterLlmModel);
+				} else if (this.plugin.settings.llmProvider === "azure-openai" && this.plugin.settings.azureLlmApiKey) {
+					llmNames = await generateZoneNamesAzureOpenAI(clusters, this.plugin.settings.azureLlmEndpoint, this.plugin.settings.azureLlmModel, this.plugin.settings.azureLlmApiKey);
 				}
 				for (const [idx, name] of llmNames) {
 					labelMap[idx] = name;
@@ -1209,6 +1212,8 @@ export class ChorographiaView extends ItemView {
 					llmNames = await generateZoneNames(batchClusters, this.plugin.settings.openaiApiKey, this.plugin.settings.openaiLlmModel);
 				} else if (this.plugin.settings.llmProvider === "openrouter" && this.plugin.settings.openrouterApiKey) {
 					llmNames = await generateZoneNamesOpenRouter(batchClusters, this.plugin.settings.openrouterApiKey, this.plugin.settings.openrouterLlmModel);
+				} else if (this.plugin.settings.llmProvider === "azure-openai" && this.plugin.settings.azureLlmApiKey) {
+					llmNames = await generateZoneNamesAzureOpenAI(clusters, this.plugin.settings.azureLlmEndpoint, this.plugin.settings.azureLlmModel, this.plugin.settings.azureLlmApiKey);
 				}
 				for (const [batchIdx, name] of llmNames) {
 					const c = allSubClusters[batchIdx];
